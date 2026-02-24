@@ -6,14 +6,14 @@ const CURRENT_USER_ID = 1
 
 export const useWorkspaceStore = defineStore('workspace', () => {
   const currentUser = ref({ id: CURRENT_USER_ID, name: 'Алексей Иванов', initials: 'АИ', role: '2-й курс · ИТ' })
-  const courses     = ref([])
-  const isLoading   = ref(false)
-  const toast       = ref('')
+  const courses   = ref([])
+  const isLoading = ref(false)
+  const toast     = ref('')
 
   const todayEvents = ref([
-    { id: 1, time: '09:00', title: 'Лекция: Алгоритмы и СД',  location: 'Аудитория 312',  color: '#3d52d5' },
-    { id: 2, time: '11:30', title: 'Практика: Базы данных',    location: 'Лаборатория 4Б', color: '#2d7a4f' },
-    { id: 3, time: '14:00', title: 'Английский язык',          location: 'Онлайн (Zoom)',   color: '#0891b2' },
+    { id: 1, time: '09:00', title: 'Лекция: Алгоритмы и СД',  location: 'Аудитория 312',    color: '#3d52d5' },
+    { id: 2, time: '11:30', title: 'Практика: Базы данных',     location: 'Лаборатория 4Б',   color: '#2d7a4f' },
+    { id: 3, time: '14:00', title: 'Английский язык',           location: 'Онлайн (Zoom)',     color: '#0891b2' },
   ])
 
   const allAssignments = computed(() => {
@@ -43,6 +43,16 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       showToast('Курс успешно добавлен!')
       return created
     } catch (e) { showToast('Ошибка: ' + e.message) }
+  }
+
+  async function updateCourse(courseId, payload) {
+    try {
+      const updated = await api.updateCourse(courseId, payload)
+      const idx = courses.value.findIndex((c) => c.id === courseId)
+      if (idx !== -1) courses.value[idx] = updated
+      showToast('Курс обновлён')
+      return updated
+    } catch (e) { showToast('Ошибка обновления: ' + e.message) }
   }
 
   async function deleteCourse(courseId) {
@@ -79,6 +89,19 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       if (course) course.assignments = [...(course.assignments || []), a]
       showToast('Задание добавлено!')
       return a
+    } catch (e) { showToast('Ошибка: ' + e.message) }
+  }
+
+  async function updateAssignmentFull(courseId, assignmentId, formData) {
+    try {
+      const updated = await api.fullUpdateAssignment(courseId, assignmentId, formData)
+      const course = courses.value.find((c) => c.id === courseId)
+      if (course) {
+        const idx = (course.assignments || []).findIndex((a) => a.id === assignmentId)
+        if (idx !== -1) course.assignments[idx] = updated
+      }
+      showToast('Задание обновлено!')
+      return updated
     } catch (e) { showToast('Ошибка: ' + e.message) }
   }
 
@@ -120,16 +143,16 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   function humanSize(bytes) {
-    if (bytes < 1024)      return bytes + ' Б'
-    if (bytes < 1048576)   return (bytes/1024).toFixed(0) + ' КБ'
+    if (bytes < 1024)    return bytes + ' Б'
+    if (bytes < 1048576) return (bytes/1024).toFixed(0) + ' КБ'
     return (bytes/1048576).toFixed(1) + ' МБ'
   }
 
   return {
     currentUser, courses, isLoading, toast, todayEvents, allAssignments,
-    fetchCourses, addCourse, deleteCourse,
+    fetchCourses, addCourse, updateCourse, deleteCourse,
     uploadMaterial, deleteMaterial,
-    createAssignment, updateAssignmentStatus, deleteAssignment,
+    createAssignment, updateAssignmentFull, updateAssignmentStatus, deleteAssignment,
     showToast, statusLabel, urgencyClass, humanSize,
   }
 })

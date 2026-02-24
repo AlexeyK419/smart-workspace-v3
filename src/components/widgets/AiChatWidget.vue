@@ -40,11 +40,11 @@
         <!-- Error bubble -->
         <div v-if="apiError && !isTyping" class="error-bubble">
           ⚠️ {{ apiError }}
-          <span class="error-hint">Проверьте GIGACHAT_CLIENT_ID в backend/.env</span>
+          <span class="error-hint">Проверьте GIGACHAT_AUTH_KEY в backend/.env</span>
         </div>
       </div>
 
-      <!-- Suggestions (shown only at start) -->
+      <!-- Suggestions -->
       <div v-if="suggestions.length" class="chat-suggestions">
         <button v-for="s in suggestions" :key="s" class="suggestion-chip" @click="sendText(s)">
           {{ s }}
@@ -93,14 +93,12 @@ const inputText = ref('')
 const apiError  = ref('')
 const messagesEl = ref(null)
 
-// Conversation history sent to GigaChat (role + content only)
 const history = ref([])
 
-// Display messages (include id + time for UI)
 const messages = ref([
   {
     id: 1, role: 'assistant', time: now(),
-    content: 'Привет! Я **GigaChat** — AI-ассистент от Сбера. Помогу разобраться с учебным материалом, составить план подготовки или объяснить сложную тему. Чем могу помочь?',
+    content: 'Привет! Я **GigaChat** — AI-ассистент. Помогу разобраться с учебным материалом, составить план или подсказать направление. Обрати внимание: я не даю готовых решений, но помогу тебе прийти к ответу самостоятельно! 💡',
   },
 ])
 
@@ -118,11 +116,10 @@ async function send() {
   const text = inputText.value.trim()
   if (!text || isTyping.value) return
 
-  apiError.value = ''
+  apiError.value   = ''
   suggestions.value = []
-  inputText.value = ''
+  inputText.value  = ''
 
-  // Add user message to display + history
   messages.value.push({ id: Date.now(), role: 'user', content: text, time: now() })
   history.value.push({ role: 'user', content: text })
 
@@ -132,7 +129,6 @@ async function send() {
   try {
     const res = await api.aiChat(history.value)
     const reply = res.reply
-
     messages.value.push({ id: Date.now() + 1, role: 'assistant', content: reply, time: now() })
     history.value.push({ role: 'assistant', content: reply })
   } catch (e) {
@@ -153,7 +149,6 @@ async function scrollToBottom() {
   if (messagesEl.value) messagesEl.value.scrollTop = messagesEl.value.scrollHeight
 }
 
-// Minimal markdown → HTML for chat bubbles
 function renderMd(text) {
   return text
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -165,7 +160,6 @@ function renderMd(text) {
 </script>
 
 <style scoped>
-/* FAB */
 .chat-fab {
   position: fixed; right: 24px; bottom: 24px; z-index: 90;
   width: 52px; height: 52px; border-radius: 50%;
@@ -175,15 +169,12 @@ function renderMd(text) {
   transition: transform var(--transition), box-shadow var(--transition);
 }
 .chat-fab:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(26,122,50,.55); }
-
 .chat-badge {
   position: absolute; top: -2px; right: -4px;
   background: #fff; color: #1a7a32; border: 1.5px solid #1a7a32;
   border-radius: 99px; font-size: 9px; font-weight: 800;
   padding: 1px 5px; letter-spacing: 0.3px;
 }
-
-/* Panel */
 .chat-panel {
   position: fixed; right: 24px; bottom: 84px; z-index: 90;
   width: 350px; height: 520px;
@@ -191,19 +182,16 @@ function renderMd(text) {
   border-radius: 18px; display: flex; flex-direction: column;
   box-shadow: var(--shadow-lg); overflow: hidden;
 }
-
 .chat-panel-header {
   padding: 14px 16px; border-bottom: 1px solid var(--border-soft);
   display: flex; align-items: center; gap: 10px;
   background: linear-gradient(to right, #f0fdf4, var(--surface));
 }
-
 .gc-avatar {
   width: 34px; height: 34px; border-radius: 50%;
   background: linear-gradient(135deg, #1a7a32, #0f5522);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-
 .chat-ai-name  { font-size: 13.5px; font-weight: 700; color: #1a7a32; }
 .chat-ai-status {
   font-size: 11px; color: #2d7a4f;
@@ -216,25 +204,19 @@ function renderMd(text) {
 }
 .chat-ai-status.error { color: var(--danger); }
 .chat-ai-status.error::before { background: var(--danger); animation: none; }
-
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-
 .chat-close-btn {
   margin-left: auto; width: 26px; height: 26px; border-radius: 6px;
   border: 1px solid var(--border); background: transparent;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
 .chat-close-btn:hover { background: var(--surface-2); }
-
-/* Messages */
 .chat-messages {
   flex: 1; overflow-y: auto; padding: 14px;
   display: flex; flex-direction: column; gap: 10px;
 }
-
 .msg { display: flex; gap: 8px; align-items: flex-end; }
 .msg.user { flex-direction: row-reverse; }
-
 .msg-bubble {
   max-width: 80%; padding: 9px 13px; border-radius: 14px;
   font-size: 13px; line-height: 1.6;
@@ -250,29 +232,23 @@ function renderMd(text) {
   background: var(--border-soft); border-radius: 4px; padding: 1px 5px;
   font-size: 12px; font-family: 'Courier New', monospace;
 }
-
 .msg-avatar {
   width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center; font-size: 11px;
 }
 .ai-av   { background: linear-gradient(135deg, #1a7a32, #0f5522); color: white; }
 .user-av { background: var(--surface-2); color: var(--text-muted); }
-
 .msg-time { font-size: 10px; color: var(--text-muted); margin-top: 2px; text-align: right; }
-
 .typing-bubble {
   background: var(--surface-2); border-radius: 14px;
   border-bottom-left-radius: 4px; padding: 12px 16px;
 }
-
 .error-bubble {
   background: var(--danger-bg); color: var(--danger);
   border-radius: 10px; padding: 10px 14px; font-size: 12.5px;
   display: flex; flex-direction: column; gap: 4px;
 }
 .error-hint { font-size: 11px; color: var(--text-muted); }
-
-/* Suggestions */
 .chat-suggestions {
   padding: 0 12px 10px; display: flex; gap: 6px; flex-wrap: wrap;
 }
@@ -283,8 +259,6 @@ function renderMd(text) {
   font-family: var(--font-body); white-space: nowrap;
 }
 .suggestion-chip:hover { background: #1a7a32; color: white; }
-
-/* Input */
 .chat-input-wrap {
   padding: 10px 12px; border-top: 1px solid var(--border-soft);
   display: flex; gap: 8px; align-items: flex-end;
@@ -297,7 +271,6 @@ function renderMd(text) {
 }
 .chat-input:focus { border-color: #1a7a32; }
 .chat-input:disabled { opacity: .6; }
-
 .chat-send-btn {
   width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
   background: linear-gradient(135deg, #1a7a32, #0f5522);
@@ -305,11 +278,9 @@ function renderMd(text) {
   display: flex; align-items: center; justify-content: center;
   transition: opacity var(--transition), transform var(--transition);
 }
-.chat-send-btn:hover  { opacity: .9; }
+.chat-send-btn:hover { opacity: .9; }
 .chat-send-btn:active { transform: scale(.92); }
 .chat-send-btn:disabled { opacity: .4; cursor: not-allowed; }
-
-/* Transitions */
 .chat-slide-enter-active, .chat-slide-leave-active {
   transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
 }

@@ -30,6 +30,7 @@ import { ref, computed } from 'vue'
 const DAY_NAMES   = ['пн','вт','ср','чт','пт','сб','вс']
 const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 const EVENT_DAYS  = new Set([5, 10, 15, 19, 22, 28])
+
 const now   = new Date()
 const year  = ref(now.getFullYear())
 const month = ref(now.getMonth())
@@ -60,39 +61,39 @@ function next() { if (month.value === 11) { month.value = 0; year.value++ } else
 </script>
 
 <style scoped>
-.calendar-widget { margin-bottom: 16px; padding: 14px 16px; }
+.calendar-widget { margin-bottom: 12px; padding: 10px 12px; }
 
-.cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.cal-month  { font-family: var(--font-display); font-size: 14px; font-weight: 600; }
+.cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.cal-month  { font-family: var(--font-display); font-size: 12px; font-weight: 600; }
 .cal-nav    { display: flex; gap: 2px; }
 .cal-nav-btn {
-  width: 22px; height: 22px; border-radius: 5px;
+  width: 20px; height: 20px; border-radius: 4px;
   border: 1px solid var(--border); background: transparent;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: background var(--transition);
 }
 .cal-nav-btn:hover { background: var(--surface-2); }
-.cal-nav-btn svg   { width: 12px; height: 12px; }
+.cal-nav-btn svg { width: 10px; height: 10px; }
 
-.cal-days-header { display: grid; grid-template-columns: repeat(7,1fr); gap: 1px; margin-bottom: 2px; }
+.cal-days-header { display: grid; grid-template-columns: repeat(7,1fr); gap: 1px; margin-bottom: 1px; }
 .cal-day-name {
-  text-align: center; font-size: 9px; font-weight: 600;
-  color: var(--text-muted); padding: 2px;
+  text-align: center; font-size: 8px; font-weight: 600;
+  color: var(--text-muted); padding: 1px;
   letter-spacing: 0.3px; text-transform: uppercase;
 }
 
 .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 1px; }
 .cal-cell {
   aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
-  border-radius: 4px; font-size: 11px; cursor: pointer;
+  border-radius: 3px; font-size: 9px; cursor: pointer;
   transition: background var(--transition); position: relative;
 }
-.cal-cell:hover               { background: var(--surface-2); }
-.cal-cell.other-month         { color: var(--text-muted); opacity: 0.35; }
-.cal-cell.today               { background: var(--accent); color: white; font-weight: 700; }
+.cal-cell:hover           { background: var(--surface-2); }
+.cal-cell.other-month     { color: var(--text-muted); opacity: 0.35; }
+.cal-cell.today           { background: var(--accent); color: white; font-weight: 700; }
 .cal-cell.has-event::after {
-  content: ''; position: absolute; bottom: 2px; left: 50%;
-  transform: translateX(-50%); width: 3px; height: 3px;
+  content: ''; position: absolute; bottom: 1px; left: 50%;
+  transform: translateX(-50%); width: 2px; height: 2px;
   border-radius: 50%; background: var(--accent);
 }
 .cal-cell.today::after { background: rgba(255,255,255,0.65); }

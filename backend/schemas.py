@@ -22,7 +22,7 @@ class UserOut(BaseModel):
 class CourseCreate(BaseModel):
     name: str
     color: str = "#3d52d5"
-    emoji: str = "📚"
+    emoji: str = "📘"
     teacher: str = ""
     semester: str = ""
     credits: int = 3
@@ -49,6 +49,7 @@ class CourseOut(BaseModel):
     semester: str
     credits: int
     progress: float
+    ai_plan: str | None = None
     materials: list["MaterialOut"] = []
     assignments: list["AssignmentOut"] = []
 
@@ -94,6 +95,7 @@ class AssignmentOut(BaseModel):
     deadline: str
     status: str
     file_name: str | None = None
+    ai_advice: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

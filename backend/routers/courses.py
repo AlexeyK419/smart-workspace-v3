@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
@@ -51,5 +52,12 @@ def delete_course(course_id: int, db: Session = Depends(get_db)):
     course = db.get(models.Course, course_id)
     if not course:
         raise HTTPException(404, "Course not found")
+    # Clean up files on disk
+    for mat in (course.materials or []):
+        if mat.file_path and os.path.exists(mat.file_path):
+            os.remove(mat.file_path)
+    for a in (course.assignments or []):
+        if a.file_path and os.path.exists(a.file_path):
+            os.remove(a.file_path)
     db.delete(course)
     db.commit()

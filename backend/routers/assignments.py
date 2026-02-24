@@ -100,6 +100,45 @@ def update_assignment(
     return a
 
 
+@router.put("/{assignment_id}", response_model=schemas.AssignmentOut)
+async def full_update_assignment(
+    course_id:     int,
+    assignment_id: int,
+    title:       str = Form(...),
+    description: str = Form(""),
+    deadline:    str = Form(""),
+    status:      str = Form("pending"),
+    file: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+):
+    """Full update of an assignment including optional file replacement."""
+    a = _get_assignment_or_404(course_id, assignment_id, db)
+
+    a.title = title
+    a.description = description
+    a.deadline = deadline
+    a.status = status
+
+    if file and file.filename:
+        # Remove old file
+        if a.file_path and os.path.exists(a.file_path):
+            os.remove(a.file_path)
+        contents = await file.read()
+        if len(contents) > MAX_FILE_SIZE:
+            raise HTTPException(413, "File too large (max 50 MB)")
+        ext       = os.path.splitext(file.filename)[1]
+        disk_name = f"{uuid.uuid4().hex}{ext}"
+        disk_path = os.path.join(UPLOAD_DIR, disk_name)
+        with open(disk_path, "wb") as f:
+            f.write(contents)
+        a.file_path = disk_path
+        a.file_name = file.filename
+
+    db.commit()
+    db.refresh(a)
+    return a
+
+
 @router.get("/{assignment_id}/download")
 def download_assignment_file(course_id: int, assignment_id: int, db: Session = Depends(get_db)):
     a = _get_assignment_or_404(course_id, assignment_id, db)
