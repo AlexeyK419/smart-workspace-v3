@@ -1,249 +1,356 @@
 <template>
-  <div>
-    <!-- Header + Add button -->
-    <div class="tab-header">
-      <div class="tab-count">{{ course.assignments?.length ?? 0 }} заданий</div>
-      <button class="btn btn-primary" @click="openAddForm">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-        Добавить задание
-      </button>
-    </div>
+  <div class="modal-overlay" @click.self="emit('close')">
+    <div class="modal ai-help-modal">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="ai-icon">🤖</span>
+          AI-помощник по заданию
+        </div>
+        <button class="modal-close" @click="emit('close')">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
 
-    <!-- Add / Edit Assignment Form (inline) -->
-    <Transition name="form-slide">
-      <div v-if="showForm" class="add-form card">
-        <div class="add-form-title">{{ editingId ? 'Редактировать задание' : 'Новое задание' }}</div>
-        <div class="form-row">
-          <div class="form-group" style="flex:2">
-            <label class="form-label">Название *</label>
-            <input class="form-input" v-model="form.title" placeholder="Например: Лабораторная работа №5" />
-          </div>
-          <div class="form-group" style="flex:1">
-            <label class="form-label">Дедлайн</label>
-            <input class="form-input" type="date" v-model="form.deadline_raw" />
+      <div class="modal-body">
+        <!-- Assignment info -->
+        <div class="assignment-info">
+          <div class="assignment-info-title">{{ assignment.title }}</div>
+          <div class="assignment-info-desc" v-if="assignment.description">{{ assignment.description }}</div>
+          <div class="assignment-info-meta">
+            <span v-if="assignment.deadline">📅 {{ assignment.deadline }}</span>
+            <span class="chip" :class="'chip-' + assignment.status">{{ statusLabel(assignment.status) }}</span>
           </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Описание</label>
-          <textarea class="form-input" v-model="form.description" rows="2" placeholder="Краткое описание задания..."></textarea>
+
+        <!-- Question input -->
+        <div class="question-section">
+          <label class="form-label">Ваш вопрос (необязательно)</label>
+          <textarea 
+            class="form-input question-input" 
+            v-model="question" 
+            rows="2"
+            placeholder="Например: не понимаю с чего начать, как подойти к решению..."
+            :disabled="isLoading"
+          ></textarea>
         </div>
-        <div class="form-row" style="align-items:flex-end">
-          <div class="form-group" style="flex:1">
-            <label class="form-label">Статус</label>
-            <select class="form-input" v-model="form.status">
-              <option value="pending">Ожидает</option>
-              <option value="progress">В процессе</option>
-              <option value="done">Сдано</option>
-            </select>
+
+        <!-- Loading state -->
+        <div v-if="isLoading" class="loading-state">
+          <div class="gigachat-badge">
+            <span class="gc-dot"></span>
+            GigaChat
           </div>
-          <div class="form-group" style="flex:2">
-            <label class="form-label">Прикрепить файл (опционально)</label>
-            <label class="file-pick-label">
-              <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
-              {{ form.file ? form.file.name : 'Выбрать файл' }}
-              <input type="file" class="file-input" @change="e => form.file = e.target.files[0]" />
-            </label>
-          </div>
+          <div class="dots"><span></span><span></span><span></span></div>
+          <span>Анализирует задание и готовит подсказки...</span>
         </div>
-        <div class="form-actions">
-          <button class="btn btn-ghost" @click="cancelForm">Отмена</button>
-          <button class="btn btn-primary" :disabled="!form.title || saving" @click="submitForm">
-            {{ saving ? 'Сохранение...' : (editingId ? 'Сохранить' : 'Создать') }}
-          </button>
+
+        <!-- Error state -->
+        <div v-else-if="error" class="error-state">
+          <div class="error-icon">⚠️</div>
+          <div class="error-title">Ошибка</div>
+          <div class="error-msg">{{ error }}</div>
+          <button class="btn btn-ghost" style="margin-top:12px" @click="error = ''">Попробовать снова</button>
+        </div>
+
+        <!-- AI Response -->
+        <div v-else-if="advice" class="advice-content">
+          <div class="advice-header">
+            <div class="gigachat-badge">
+              <span class="gc-dot"></span>
+              Подсказка от GigaChat
+            </div>
+          </div>
+          <div class="advice-body" v-html="renderedAdvice"></div>
+        </div>
+
+        <!-- Initial state - no advice yet -->
+        <div v-else class="initial-state">
+          <div class="initial-icon">💡</div>
+          <p>Нажмите «Получить подсказку», чтобы AI проанализировал задание и дал рекомендации по выполнению.</p>
+          <p class="initial-note">AI не даст готовое решение, но поможет разобраться!</p>
         </div>
       </div>
-    </Transition>
 
-    <!-- Empty -->
-    <div v-if="!course.assignments?.length && !showForm" class="empty-state">
-      <div class="empty-icon">📋</div>
-      <p>Заданий пока нет. Добавьте первое!</p>
-    </div>
-
-    <!-- Assignment cards -->
-    <div class="assignments-grid">
-      <div v-for="a in course.assignments" :key="a.id" class="assignment-card">
-        <div class="ac-top">
-          <div class="ac-title">{{ a.title }}</div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <select class="status-select" :value="a.status" @change="changeStatus(a, $event)">
-              <option value="pending">Ожидает</option>
-              <option value="progress">В процессе</option>
-              <option value="done">Сдано</option>
-              <option value="overdue">Просрочено</option>
-            </select>
-            <span class="chip" :class="'chip-' + a.status">{{ store.statusLabel(a.status) }}</span>
-          </div>
-        </div>
-
-        <div class="ac-desc">{{ a.description }}</div>
-
-        <!-- Saved AI advice preview -->
-        <div v-if="a.ai_advice" class="ac-ai-saved">
-          💡 AI-подсказка сохранена
-        </div>
-
-        <div class="ac-footer">
-          <div class="ac-deadline" v-if="a.deadline">
-            <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
-            {{ a.deadline }}
-          </div>
-          <div style="display:flex;gap:6px;margin-left:auto">
-            <a v-if="a.file_name" :href="api.downloadAssignmentUrl(course.id, a.id)" target="_blank" class="ac-btn" title="Скачать файл">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-              {{ a.file_name }}
-            </a>
-            <button class="ac-btn" title="Редактировать" @click="openEditForm(a)">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-            </button>
-            <button class="ac-btn ac-btn-ai" @click="emit('ai-help', a)">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-              AI
-            </button>
-            <button class="ac-btn ac-btn-del" title="Удалить" @click="remove(a.id)">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-            </button>
-          </div>
-        </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" @click="emit('close')">Закрыть</button>
+        <button 
+          class="btn btn-primary ai-btn" 
+          @click="getHelp" 
+          :disabled="isLoading"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px">
+            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V15a1 1 0 0 0-2 0v1.93A8 8 0 0 1 4.07 13H6a1 1 0 0 0 0-2H4.07A8 8 0 0 1 11 4.07V6a1 1 0 0 0 2 0V4.07A8 8 0 0 1 19.93 11H18a1 1 0 0 0 0 2h1.93A8 8 0 0 1 13 16.93z"/>
+          </svg>
+          {{ isLoading ? 'Загрузка...' : (advice ? 'Обновить подсказку' : 'Получить подсказку') }}
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { useWorkspaceStore } from '@/stores/workspace'
+import { ref, computed } from 'vue'
 import { api } from '@/api/index.js'
 
-const props = defineProps({ course: { type: Object, required: true } })
-const emit  = defineEmits(['ai-help'])
-const store = useWorkspaceStore()
+const props = defineProps({
+  assignment: { type: Object, required: true }
+})
 
-const showForm  = ref(false)
-const saving    = ref(false)
-const editingId = ref(null)
-const form = reactive({ title: '', description: '', deadline_raw: '', status: 'pending', file: null })
+const emit = defineEmits(['close'])
 
-function openAddForm() {
-  editingId.value = null
-  Object.assign(form, { title: '', description: '', deadline_raw: '', status: 'pending', file: null })
-  showForm.value = true
+const question = ref('')
+const advice = ref(props.assignment.ai_advice || '')
+const isLoading = ref(false)
+const error = ref('')
+
+function statusLabel(status) {
+  return { pending: 'Ожидает', progress: 'В процессе', done: 'Сдано', overdue: 'Просрочено' }[status] ?? status
 }
 
-function openEditForm(a) {
-  editingId.value = a.id
-  Object.assign(form, {
-    title: a.title,
-    description: a.description,
-    deadline_raw: '',
-    status: a.status,
-    file: null,
-  })
-  showForm.value = true
-}
-
-function cancelForm() {
-  showForm.value = false
-  editingId.value = null
-  Object.assign(form, { title: '', description: '', deadline_raw: '', status: 'pending', file: null })
-}
-
-function formatDeadline(raw) {
-  if (!raw) return ''
-  const d = new Date(raw)
-  const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`
-}
-
-async function submitForm() {
-  if (!form.title) return
-  saving.value = true
-  const fd = new FormData()
-  fd.append('title',       form.title)
-  fd.append('description', form.description)
-  fd.append('deadline',    formatDeadline(form.deadline_raw) || (editingId.value ? '' : ''))
-  fd.append('status',      form.status)
-  if (form.file) fd.append('file', form.file)
-
-  if (editingId.value) {
-    await store.updateAssignmentFull(props.course.id, editingId.value, fd)
-  } else {
-    await store.createAssignment(props.course.id, fd)
+async function getHelp() {
+  isLoading.value = true
+  error.value = ''
+  
+  try {
+    const res = await api.aiAssignmentHelp(props.assignment.id, question.value)
+    advice.value = res.advice
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    isLoading.value = false
   }
-  saving.value = false
-  cancelForm()
 }
 
-async function changeStatus(a, e) {
-  await store.updateAssignmentStatus(props.course.id, a.id, e.target.value)
-}
-
-async function remove(id) {
-  if (!confirm('Удалить задание?')) return
-  await store.deleteAssignment(props.course.id, id)
-}
+const renderedAdvice = computed(() => {
+  if (!advice.value) return ''
+  return advice.value
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/^(\d+)\. (.+)$/gm, '<li><span class="li-num">$1.</span> $2</li>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/<\/li>\n<li>/g, '</li><li>')
+    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/<p><\/p>/g, '')
+})
 </script>
 
 <style scoped>
-.tab-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.tab-count  { font-size: 14px; font-weight: 600; }
-.add-form { margin-bottom: 16px; padding: 18px; border: 1.5px solid var(--accent-mid); }
-.add-form-title { font-weight: 600; font-size: 14px; margin-bottom: 14px; color: var(--accent); }
-.form-row { display: flex; gap: 12px; }
-.form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
-.file-pick-label {
-  display: flex; align-items: center; gap: 7px;
-  padding: 8px 12px; border: 1px solid var(--border);
-  border-radius: var(--radius-sm); cursor: pointer; font-size: 12.5px;
-  color: var(--text-secondary); background: var(--bg);
-  transition: border-color var(--transition);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.ai-help-modal {
+  max-width: 600px;
+  max-height: 85vh;
 }
-.file-pick-label:hover { border-color: var(--accent); color: var(--accent); }
-.file-input { display: none; }
-.empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
-.empty-icon  { font-size: 36px; margin-bottom: 10px; }
-.empty-state p { font-size: 13.5px; }
-.assignments-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 14px;
+
+.ai-icon {
+  margin-right: 8px;
 }
-.assignment-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 16px;
-  transition: box-shadow var(--transition);
+
+.assignment-info {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin-bottom: 16px;
 }
-.assignment-card:hover { box-shadow: var(--shadow); }
-.ac-top {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 8px; margin-bottom: 8px;
+
+.assignment-info-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 6px;
 }
-.ac-title { font-size: 13.5px; font-weight: 600; line-height: 1.4; }
-.ac-desc  { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.55; }
-.ac-ai-saved {
-  font-size: 11px; color: #1a7a32; background: #e8f5e9;
-  border-radius: 6px; padding: 4px 8px; margin-bottom: 8px;
+
+.assignment-info-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.assignment-info-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.question-section {
+  margin-bottom: 16px;
+}
+
+.question-input {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.gigachat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #1a7a32;
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 99px;
+  padding: 3px 10px;
+}
+
+.gc-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #1a7a32;
   display: inline-block;
+  animation: pulse 2s ease-in-out infinite;
 }
-.ac-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-.ac-deadline { font-size: 11.5px; color: var(--text-muted); display: flex; align-items: center; gap: 3px; }
-.status-select {
-  font-size: 11px; border: 1px solid var(--border); border-radius: 4px;
-  padding: 2px 4px; background: var(--bg); font-family: var(--font-body);
-  color: var(--text-secondary); cursor: pointer; outline: none;
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
-.ac-btn {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 5px 9px; border-radius: var(--radius-sm);
-  border: 1px solid var(--border); background: transparent;
-  font-size: 11.5px; font-weight: 500; cursor: pointer;
-  transition: all var(--transition); font-family: var(--font-body);
-  color: var(--text-muted); text-decoration: none;
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 40px 20px;
 }
-.ac-btn:hover { background: var(--surface-2); color: var(--text-primary); }
-.ac-btn svg { width: 12px; height: 12px; }
-.ac-btn-ai { border-color: var(--accent-mid); color: var(--accent); background: var(--accent-light); }
-.ac-btn-ai:hover { background: var(--accent); color: white; }
-.ac-btn-del:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
-.form-slide-enter-active, .form-slide-leave-active { transition: all 0.25s ease; }
-.form-slide-enter-from, .form-slide-leave-to { opacity: 0; transform: translateY(-10px); }
+
+.loading-state span {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.error-state {
+  text-align: center;
+  padding: 30px 20px;
+}
+
+.error-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+.error-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.error-msg {
+  font-size: 13px;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.initial-state {
+  text-align: center;
+  padding: 30px 20px;
+  color: var(--text-muted);
+}
+
+.initial-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.initial-state p {
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.initial-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.advice-content {
+  background: #f0fdf4;
+  border: 1px solid #a5d6a7;
+  border-radius: var(--radius-sm);
+  padding: 16px;
+}
+
+.advice-header {
+  margin-bottom: 12px;
+}
+
+.advice-body {
+  line-height: 1.8;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+}
+
+.advice-body :deep(h1) {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  margin: 14px 0 6px;
+  color: var(--text-primary);
+}
+
+.advice-body :deep(h2) {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  margin: 12px 0 4px;
+  color: var(--text-primary);
+}
+
+.advice-body :deep(h3) {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 10px 0 4px;
+  color: var(--text-primary);
+}
+
+.advice-body :deep(strong) {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.advice-body :deep(ul) {
+  list-style: none;
+  padding-left: 0;
+  margin: 8px 0;
+}
+
+.advice-body :deep(li) {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.advice-body :deep(li)::before {
+  content: '—';
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.advice-body :deep(.li-num) {
+  color: var(--accent);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.advice-body :deep(p) {
+  margin: 8px 0;
+}
+
+.ai-btn {
+  background: linear-gradient(135deg, #1a7a32, #0f5522);
+}
+
+.ai-btn:hover {
+  opacity: 0.9;
+}
 </style>

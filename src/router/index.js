@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import DashboardPage    from '@/pages/DashboardPage.vue'
+import DashboardPage from '@/pages/DashboardPage.vue'
 import CourseDetailPage from '@/pages/CourseDetailPage.vue'
+import SchedulePage from '@/pages/SchedulePage.vue'
 
 const routes = [
   {
@@ -14,6 +15,12 @@ const routes = [
     name: 'course',
     component: CourseDetailPage,
     meta: { breadcrumb: 'Курс' },
+  },
+  {
+    path: '/schedule',
+    name: 'schedule',
+    component: SchedulePage,
+    meta: { breadcrumb: 'Расписание' },
   },
   {
     path: '/:pathMatch(.*)*',
