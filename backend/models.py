@@ -7,10 +7,14 @@ from database import Base
 class User(Base):
     __tablename__ = "users"
 
-    id:       Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name:     Mapped[str] = mapped_column(String(120))
-    initials: Mapped[str] = mapped_column(String(10))
-    role:     Mapped[str] = mapped_column(String(120), default="Студент")
+    id:            Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name:          Mapped[str] = mapped_column(String(120))
+    initials:      Mapped[str] = mapped_column(String(10))
+    role:          Mapped[str] = mapped_column(String(120), default="Студент")
+    email:         Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    password_salt: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    auth_token:    Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
 
     courses: Mapped[list["Course"]] = relationship("Course", back_populates="user", cascade="all, delete-orphan")
     schedule_events: Mapped[list["ScheduleEvent"]] = relationship(

@@ -1,8 +1,10 @@
 """
-Smart Student Workspace — FastAPI backend v3
+Smart Student Workspace — FastAPI backend v4
   • PostgreSQL via SQLAlchemy 2
+  • token-based auth (register/login/me)
+  • per-user data isolation
   • AI assistant integration
-  • File uploads (materials + assignments)
+  • file uploads (materials + assignments)
 """
 
 import logging
@@ -11,11 +13,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
+from auth import compute_initials, hash_password
 from config import settings
 from database import engine, SessionLocal
 import models
-from routers import users, courses, materials, assignments, ai, schedule
+from routers import auth, users, courses, materials, assignments, ai, schedule
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -26,13 +30,60 @@ def init_db():
     logger.info("Database tables ensured")
 
 
+def upgrade_schema():
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255)"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_salt VARCHAR(64)"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_token VARCHAR(255)"))
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users (email)"))
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_auth_token ON users (auth_token)"))
+    logger.info("Database auth columns ensured")
+
+
+def upgrade_legacy_users_auth():
+    db = SessionLocal()
+    try:
+        legacy_users = (
+            db.query(models.User)
+            .filter(
+                (models.User.email.is_(None))
+                | (models.User.password_hash.is_(None))
+                | (models.User.password_salt.is_(None))
+            )
+            .all()
+        )
+        for user in legacy_users:
+            if not user.email:
+                user.email = f"legacy{user.id}@workspace.local"
+            if not user.initials:
+                user.initials = compute_initials(user.name)
+            if not user.password_hash or not user.password_salt:
+                salt, password_hash = hash_password("workspace123")
+                user.password_salt = salt
+                user.password_hash = password_hash
+        if legacy_users:
+            db.commit()
+            logger.info("Legacy users received auth credentials")
+    finally:
+        db.close()
+
+
 def seed():
     db = SessionLocal()
     try:
         if db.query(models.User).count() > 0:
             return
 
-        user = models.User(name="Алексей Иванов", initials="АИ", role="2-й курс · ИТ")
+        salt, password_hash = hash_password("workspace123")
+        user = models.User(
+            name="Алексей Иванов",
+            initials="АИ",
+            role="2-й курс · ИТ",
+            email="demo@workspace.local",
+            password_salt=salt,
+            password_hash=password_hash,
+        )
         db.add(user)
         db.flush()
 
@@ -166,7 +217,7 @@ def seed():
         ])
 
         db.commit()
-        logger.info("✅ Seed data inserted (user id=1)")
+        logger.info("✅ Demo user inserted (email=demo@workspace.local, password=workspace123)")
     finally:
         db.close()
 
@@ -174,16 +225,19 @@ def seed():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    upgrade_schema()
+    upgrade_legacy_users_auth()
     seed()
     yield
 
 
 app = FastAPI(
     title="Smart Student Workspace API",
-    version="3.1.0",
+    version="4.0.0",
     description=(
         "REST API for the student workspace diploma project.\n\n"
         "**Database:** PostgreSQL\n"
+        "**Authentication:** bearer token\n"
         "**Assistant:** Workspace AI\n"
     ),
     lifespan=lifespan,
@@ -197,6 +251,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(courses.router)
 app.include_router(materials.router)

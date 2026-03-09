@@ -1,10 +1,6 @@
 """
-AI Router — endpoints backed by the workspace assistant
-──────────────────────────────────────────────────────
-POST /ai/chat                      — general chat (history-aware)
-POST /ai/courses/{id}/plan         — generate study plan for a course
-POST /ai/assignments/{id}/help     — get structured help for an assignment
-GET  /ai/models                    — list available provider models
+AI Router — endpoints backed by the workspace assistant.
+All user-specific endpoints are protected and return only the current user's data.
 """
 
 import os
@@ -13,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from auth import get_assignment_for_user_or_404, get_course_for_user_or_404, get_current_user
 from database import get_db
 from gigachat import chat_complete, list_models, Message
 import models
@@ -98,19 +95,16 @@ SYSTEM_CHAT = (
     + NO_DIRECT_ANSWERS
 )
 
-SYSTEM_PLAN = (
-    "Ты опытный академический ментор. Составляй чёткие учебные планы. "
-    + NO_DIRECT_ANSWERS
-)
-
-SYSTEM_HELP = (
-    "Ты помощник студента. Давай конкретные, практичные советы. "
-    + NO_DIRECT_ANSWERS
-)
+SYSTEM_PLAN = "Ты опытный академический ментор. Составляй чёткие учебные планы. " + NO_DIRECT_ANSWERS
+SYSTEM_HELP = "Ты помощник студента. Давай конкретные, практичные советы. " + NO_DIRECT_ANSWERS
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def ai_chat(req: ChatRequest):
+async def ai_chat(
+    req: ChatRequest,
+    current_user: models.User = Depends(get_current_user),
+):
+    _ = current_user
     system = Message(role="system", content=SYSTEM_CHAT)
     history = [Message(role=m.role, content=m.content) for m in req.messages]
     try:
@@ -130,19 +124,18 @@ async def ai_chat(req: ChatRequest):
 async def generate_study_plan(
     course_id: int,
     req: PlanRequest,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    course = db.get(models.Course, course_id)
-    if not course:
-        raise HTTPException(404, "Course not found")
+    course = get_course_for_user_or_404(course_id, current_user.id, db)
 
     all_assignments = course.assignments or []
     assignments_text = ""
-    for a in all_assignments:
-        line = f"  - «{a.title}» (дедлайн: {a.deadline}, статус: {a.status})"
-        if a.description:
-            line += f"\n    Описание: {a.description}"
-        file_content = _extract_file_text(a.file_path)
+    for assignment in all_assignments:
+        line = f"  - «{assignment.title}» (дедлайн: {assignment.deadline}, статус: {assignment.status})"
+        if assignment.description:
+            line += f"\n    Описание: {assignment.description}"
+        file_content = _extract_file_text(assignment.file_path)
         if file_content:
             line += f"\n    Содержимое файла: {file_content[:1000]}"
         assignments_text += line + "\n"
@@ -151,9 +144,9 @@ async def generate_study_plan(
 
     materials = course.materials or []
     materials_text = ""
-    for m in materials:
-        materials_text += f"  - {m.name} ({m.mime_type}, {m.size_bytes} байт)\n"
-        file_content = _extract_file_text(m.file_path)
+    for material in materials:
+        materials_text += f"  - {material.name} ({material.mime_type}, {material.size_bytes} байт)\n"
+        file_content = _extract_file_text(material.file_path)
         if file_content:
             materials_text += f"    Содержимое: {file_content[:1000]}\n"
     if not materials_text.strip():
@@ -196,12 +189,10 @@ async def generate_study_plan(
 async def assignment_help(
     assignment_id: int,
     req: HelpRequest,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    assignment = db.get(models.Assignment, assignment_id)
-    if not assignment:
-        raise HTTPException(404, "Assignment not found")
-
+    assignment = get_assignment_for_user_or_404(assignment_id, current_user.id, db)
     course = db.get(models.Course, assignment.course_id)
     course_name = course.name if course else "неизвестный курс"
 
@@ -243,7 +234,8 @@ async def assignment_help(
 
 
 @router.get("/models")
-async def get_models():
+async def get_models(current_user: models.User = Depends(get_current_user)):
+    _ = current_user
     try:
         return await list_models()
     except Exception as exc:

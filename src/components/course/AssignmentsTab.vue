@@ -89,10 +89,10 @@
             {{ a.deadline }}
           </div>
           <div style="display:flex;gap:6px;margin-left:auto">
-            <a v-if="a.file_name" :href="api.downloadAssignmentUrl(course.id, a.id)" target="_blank" class="ac-btn" title="Скачать файл">
+            <button v-if="a.file_name" class="ac-btn" title="Скачать файл" @click="downloadAssignment(a)">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
               {{ a.file_name }}
-            </a>
+            </button>
             <button class="ac-btn" title="Редактировать" @click="openEditForm(a)">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
             </button>
@@ -176,6 +176,14 @@ async function submitForm() {
 
 async function changeStatus(a, e) {
   await store.updateAssignmentStatus(props.course.id, a.id, e.target.value)
+}
+
+async function downloadAssignment(assignment) {
+  try {
+    await api.downloadAssignment(props.course.id, assignment.id, assignment.file_name || assignment.title)
+  } catch (e) {
+    store.showToast('Ошибка скачивания: ' + e.message)
+  }
 }
 
 async function remove(id) {

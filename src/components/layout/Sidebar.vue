@@ -1,6 +1,5 @@
 <template>
   <aside class="sidebar">
-    <!-- Logo -->
     <div class="sidebar-logo">
       <div class="logo-mark">
         <svg viewBox="0 0 24 24"><path d="M12 3L2 8.5V15.5L12 21L22 15.5V8.5L12 3ZM12 5.15L20 9.5V15L12 18.85L4 15V9.5L12 5.15Z" fill="white"/></svg>
@@ -11,7 +10,6 @@
       </div>
     </div>
 
-    <!-- Navigation -->
     <nav class="sidebar-nav">
       <div class="nav-section-label">Навигация</div>
 
@@ -25,7 +23,6 @@
         Расписание
       </RouterLink>
 
-      <!-- Courses Accordion -->
       <div class="nav-section-label" style="margin-top: 8px">Курсы</div>
 
       <div class="courses-header" @click="coursesOpen = !coursesOpen">
@@ -60,7 +57,6 @@
         </button>
       </div>
 
-      <!-- Other links -->
       <div class="nav-section-label" style="margin-top: 8px">Другое</div>
 
       <div class="nav-item" @click="store.showToast('Настройки в разработке')">
@@ -71,16 +67,17 @@
       </div>
     </nav>
 
-    <!-- User profile -->
     <div class="sidebar-profile">
       <div class="avatar">{{ store.currentUser.initials }}</div>
       <div class="profile-info">
         <div class="profile-name">{{ store.currentUser.name }}</div>
         <div class="profile-role">{{ store.currentUser.role }}</div>
       </div>
-      <button class="profile-btn">
+      <button class="logout-btn" @click="logout">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
         </svg>
       </button>
     </div>
@@ -89,11 +86,20 @@
 
 <script setup>
 import { ref, inject } from 'vue'
+import { useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { useAuthStore } from '@/stores/auth'
 
 const store = useWorkspaceStore()
+const authStore = useAuthStore()
+const router = useRouter()
 const coursesOpen = ref(true)
 const openAddCourse = inject('openAddCourse')
+
+async function logout() {
+  await authStore.logout()
+  router.replace('/welcome')
+}
 </script>
 
 <style scoped>
@@ -108,8 +114,6 @@ const openAddCourse = inject('openAddCourse')
   position: relative;
   z-index: 10;
 }
-
-/* Logo */
 .sidebar-logo {
   padding: 22px 20px 18px;
   border-bottom: 1px solid var(--border-soft);
@@ -117,7 +121,6 @@ const openAddCourse = inject('openAddCourse')
   align-items: center;
   gap: 10px;
 }
-
 .logo-mark {
   width: 32px;
   height: 32px;
@@ -128,20 +131,17 @@ const openAddCourse = inject('openAddCourse')
   justify-content: center;
   flex-shrink: 0;
 }
-
 .logo-mark svg {
   width: 16px;
   height: 16px;
   fill: white;
 }
-
 .logo-text {
   font-family: var(--font-display);
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.2px;
 }
-
 .logo-sub {
   font-size: 10px;
   color: var(--text-muted);
@@ -149,14 +149,11 @@ const openAddCourse = inject('openAddCourse')
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
-
-/* Nav */
 .sidebar-nav {
   flex: 1;
   overflow-y: auto;
   padding: 12px 0;
 }
-
 .nav-section-label {
   font-size: 10px;
   font-weight: 600;
@@ -165,7 +162,6 @@ const openAddCourse = inject('openAddCourse')
   color: var(--text-muted);
   padding: 8px 20px 4px;
 }
-
 .nav-item {
   display: flex;
   align-items: center;
@@ -181,30 +177,24 @@ const openAddCourse = inject('openAddCourse')
   user-select: none;
   text-decoration: none;
 }
-
 .nav-item:hover {
   background: var(--surface-2);
   color: var(--text-primary);
 }
-
 .nav-item.active {
   background: var(--accent-light);
   color: var(--accent);
   font-weight: 500;
 }
-
 .nav-item svg {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
   opacity: 0.7;
 }
-
 .nav-item.active svg {
   opacity: 1;
 }
-
-/* Accordion */
 .courses-header {
   display: flex;
   align-items: center;
@@ -219,158 +209,115 @@ const openAddCourse = inject('openAddCourse')
   transition: background var(--transition);
   user-select: none;
 }
-
 .courses-header:hover {
   background: var(--surface-2);
 }
-
 .courses-header-left {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-
 .chevron {
-  transition: transform var(--transition);
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   color: var(--text-muted);
+  transition: transform var(--transition);
 }
-
 .chevron.open {
   transform: rotate(90deg);
 }
-
 .courses-list {
   overflow: hidden;
-  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: max-height .2s ease;
 }
-
+.courses-list.expanded {
+  max-height: 500px;
+}
 .courses-list.collapsed {
   max-height: 0;
 }
-
-.courses-list.expanded {
-  max-height: 600px;
-}
-
-.course-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 16px 7px 36px;
-  margin: 1px 8px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text-secondary);
-  transition: background var(--transition), color var(--transition);
-  user-select: none;
-  text-decoration: none;
-}
-
-.course-item:hover {
-  background: var(--surface-2);
-  color: var(--text-primary);
-}
-
-.course-item.active {
-  color: var(--accent);
-  background: var(--accent-light);
-  font-weight: 500;
-}
-
-.course-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
+.course-item,
 .add-course-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 6px 16px;
-  padding: 8px 12px;
-  border: 1.5px dashed var(--border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 12.5px;
-  color: var(--text-muted);
-  transition: all var(--transition);
+  gap: 10px;
+  margin: 4px 16px 4px 36px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 13px;
+  border: 0;
   background: transparent;
-  width: calc(100% - 32px);
-  font-family: var(--font-body);
+  cursor: pointer;
 }
-
+.course-item:hover,
 .add-course-btn:hover {
-  border-color: var(--accent);
+  background: var(--surface-2);
+}
+.course-item.active {
   color: var(--accent);
   background: var(--accent-light);
 }
-
-/* Profile */
-.sidebar-profile {
-  padding: 14px 16px;
-  border-top: 1px solid var(--border-soft);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent) 0%, #7b8ef5 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: white;
+.course-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
   flex-shrink: 0;
 }
-
-.profile-info {
-  flex: 1;
-  min-width: 0;
+.add-course-btn {
+  width: calc(100% - 52px);
+  border: 1px dashed var(--border);
 }
-
+.sidebar-profile {
+  border-top: 1px solid var(--border-soft);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--accent-light);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+.profile-info {
+  min-width: 0;
+  flex: 1;
+}
 .profile-name {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .profile-role {
-  font-size: 11px;
   color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
 }
-
-.profile-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+.logout-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
   border: 1px solid var(--border);
   background: transparent;
+  display: grid;
+  place-items: center;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background var(--transition);
 }
-
-.profile-btn:hover {
+.logout-btn:hover {
   background: var(--surface-2);
 }
-
-.profile-btn svg {
-  width: 14px;
-  height: 14px;
-  color: var(--text-muted);
+.logout-btn svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
 }
 </style>

@@ -2,19 +2,31 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-class UserCreate(BaseModel):
-    name: str
-    initials: str
-    role: str = "Студент"
-
-
 class UserOut(BaseModel):
     id: int
     name: str
     initials: str
     role: str
+    email: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str = Field(min_length=6)
+    role: str = "Студент"
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=6)
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: UserOut
 
 
 class CourseCreate(BaseModel):

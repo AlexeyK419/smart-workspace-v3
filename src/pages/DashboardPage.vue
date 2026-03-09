@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div class="page-title">Добро пожаловать, {{ store.currentUser.name.split(' ')[0] }} 👋</div>
+    <div class="page-title">Добро пожаловать, {{ firstName }} 👋</div>
     <div class="page-sub">{{ todayString }}</div>
 
     <StatsRow />
@@ -28,6 +28,7 @@ import UpcomingAssignments from '@/components/dashboard/UpcomingAssignments.vue'
 
 const store = useWorkspaceStore()
 
+const firstName = computed(() => (store.currentUser.name || 'студент').split(' ')[0])
 const todayString = computed(() =>
   new Date().toLocaleDateString('ru-RU', {
     weekday: 'long',

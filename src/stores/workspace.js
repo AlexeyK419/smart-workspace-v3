@@ -1,9 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '@/api/index.js'
+import { useAuthStore } from '@/stores/auth'
 import { parseRuDate, formatTimeFromMinutes, currentDayIndex } from '@/utils/dates'
-
-const CURRENT_USER_ID = 1
 
 function normalizeScheduleEvent(event) {
   const startMinute = Number(event.start_minute)
@@ -20,11 +19,18 @@ function normalizeScheduleEvent(event) {
 }
 
 export const useWorkspaceStore = defineStore('workspace', () => {
-  const currentUser = ref({ id: CURRENT_USER_ID, name: 'Алексей Иванов', initials: 'АИ', role: '2-й курс · ИТ' })
+  const authStore = useAuthStore()
   const courses = ref([])
   const scheduleEvents = ref([])
   const isLoading = ref(false)
   const toast = ref('')
+
+  const currentUser = computed(() => authStore.currentUser || {
+    id: null,
+    name: 'Гость',
+    initials: 'GS',
+    role: 'Студент',
+  })
 
   const allAssignments = computed(() => {
     const result = []
@@ -62,10 +68,20 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       }))
   })
 
+  function resetWorkspace() {
+    courses.value = []
+    scheduleEvents.value = []
+  }
+
   async function fetchCourses() {
+    if (!authStore.isAuthenticated) {
+      courses.value = []
+      return
+    }
+
     isLoading.value = true
     try {
-      courses.value = await api.getCourses(CURRENT_USER_ID)
+      courses.value = await api.getCourses()
     } catch (e) {
       showToast('Ошибка загрузки курсов: ' + e.message)
     } finally {
@@ -74,8 +90,13 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   async function fetchSchedule() {
+    if (!authStore.isAuthenticated) {
+      scheduleEvents.value = []
+      return
+    }
+
     try {
-      const events = await api.getSchedule(CURRENT_USER_ID)
+      const events = await api.getSchedule()
       scheduleEvents.value = events.map(normalizeScheduleEvent)
     } catch (e) {
       showToast('Ошибка загрузки расписания: ' + e.message)
@@ -84,7 +105,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   async function addCourse(payload) {
     try {
-      const created = await api.createCourse(CURRENT_USER_ID, payload)
+      const created = await api.createCourse(payload)
       courses.value.push(created)
       showToast('Курс успешно добавлен!')
       return created
@@ -191,7 +212,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   async function createScheduleEvent(payload) {
     try {
-      const created = await api.createSchedule(CURRENT_USER_ID, payload)
+      const created = await api.createSchedule(payload)
       const normalized = normalizeScheduleEvent(created)
       scheduleEvents.value = [...scheduleEvents.value, normalized].sort((a, b) => (
         a.dayIndex - b.dayIndex || a.startMinute - b.startMinute
@@ -205,7 +226,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   async function updateScheduleEvent(eventId, payload) {
     try {
-      const updated = normalizeScheduleEvent(await api.updateSchedule(CURRENT_USER_ID, eventId, payload))
+      const updated = normalizeScheduleEvent(await api.updateSchedule(eventId, payload))
       const idx = scheduleEvents.value.findIndex((event) => event.id === eventId)
       if (idx !== -1) scheduleEvents.value[idx] = updated
       scheduleEvents.value = [...scheduleEvents.value].sort((a, b) => (
@@ -220,7 +241,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   async function deleteScheduleEvent(eventId) {
     try {
-      await api.deleteSchedule(CURRENT_USER_ID, eventId)
+      await api.deleteSchedule(eventId)
       scheduleEvents.value = scheduleEvents.value.filter((event) => event.id !== eventId)
       showToast('Занятие удалено')
     } catch (e) {
@@ -262,6 +283,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     todayEvents,
     fetchCourses,
     fetchSchedule,
+    resetWorkspace,
     addCourse,
     updateCourse,
     deleteCourse,

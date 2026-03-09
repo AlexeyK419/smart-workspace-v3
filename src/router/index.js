@@ -2,25 +2,32 @@ import { createRouter, createWebHistory } from 'vue-router'
 import DashboardPage from '@/pages/DashboardPage.vue'
 import CourseDetailPage from '@/pages/CourseDetailPage.vue'
 import SchedulePage from '@/pages/SchedulePage.vue'
+import WelcomePage from '@/pages/WelcomePage.vue'
 
 const routes = [
+  {
+    path: '/welcome',
+    name: 'welcome',
+    component: WelcomePage,
+    meta: { guestOnly: true },
+  },
   {
     path: '/',
     name: 'dashboard',
     component: DashboardPage,
-    meta: { breadcrumb: 'Обзор' },
+    meta: { breadcrumb: 'Обзор', requiresAuth: true },
   },
   {
     path: '/course/:id',
     name: 'course',
     component: CourseDetailPage,
-    meta: { breadcrumb: 'Курс' },
+    meta: { breadcrumb: 'Курс', requiresAuth: true },
   },
   {
     path: '/schedule',
     name: 'schedule',
     component: SchedulePage,
-    meta: { breadcrumb: 'Расписание' },
+    meta: { breadcrumb: 'Расписание', requiresAuth: true },
   },
   {
     path: '/:pathMatch(.*)*',
@@ -31,6 +38,20 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+router.beforeEach((to) => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('workspace_token') : ''
+
+  if (to.meta.requiresAuth && !token) {
+    return { name: 'welcome' }
+  }
+
+  if (to.meta.guestOnly && token) {
+    return { name: 'dashboard' }
+  }
+
+  return true
 })
 
 export default router
