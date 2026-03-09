@@ -1,1 +1,1 @@
-from routers import users, courses, materials, assignments, ai
+from routers import users, courses, materials, assignments, ai, schedule

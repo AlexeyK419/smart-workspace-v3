@@ -1,9 +1,11 @@
 import os
 import uuid
-import json
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+
 from database import get_db
 import models, schemas
 
@@ -13,6 +15,41 @@ UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads", "assignmen
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MAX_FILE_SIZE = 50 * 1024 * 1024
+
+RU_MONTHS = {
+    "янв": 1, "января": 1,
+    "фев": 2, "февраля": 2,
+    "мар": 3, "марта": 3,
+    "апр": 4, "апреля": 4,
+    "май": 5, "мая": 5,
+    "июн": 6, "июня": 6,
+    "июл": 7, "июля": 7,
+    "авг": 8, "августа": 8,
+    "сен": 9, "сентября": 9,
+    "окт": 10, "октября": 10,
+    "ноя": 11, "ноября": 11,
+    "дек": 12, "декабря": 12,
+}
+
+
+def parse_deadline(deadline: str) -> datetime | None:
+    value = (deadline or "").strip().lower()
+    if not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        pass
+
+    parts = value.replace(",", " ").split()
+    if len(parts) == 3 and parts[1] in RU_MONTHS:
+        day = int(parts[0])
+        month = RU_MONTHS[parts[1]]
+        year = int(parts[2])
+        return datetime(year, month, day)
+
+    return None
 
 
 def _get_course_or_404(course_id: int, db: Session) -> models.Course:
@@ -38,7 +75,7 @@ def list_assignments(course_id: int, db: Session = Depends(get_db)):
     return (
         db.query(models.Assignment)
         .filter(models.Assignment.course_id == course_id)
-        .order_by(models.Assignment.deadline_dt.asc())
+        .order_by(models.Assignment.deadline_dt.asc().nullslast(), models.Assignment.created_at.asc())
         .all()
     )
 
@@ -71,13 +108,14 @@ async def create_assignment(
         file_name = file.filename
 
     assignment = models.Assignment(
-        course_id   = course_id,
-        title       = title,
-        description = description,
-        deadline    = deadline,
-        status      = status,
-        file_path   = file_path,
-        file_name   = file_name,
+        course_id=course_id,
+        title=title,
+        description=description,
+        deadline=deadline,
+        deadline_dt=parse_deadline(deadline),
+        status=status,
+        file_path=file_path,
+        file_name=file_name,
     )
     db.add(assignment)
     db.commit()
@@ -93,8 +131,14 @@ def update_assignment(
     db:            Session = Depends(get_db),
 ):
     a = _get_assignment_or_404(course_id, assignment_id, db)
-    for field, value in payload.model_dump(exclude_none=True).items():
+    data = payload.model_dump(exclude_none=True)
+
+    for field, value in data.items():
         setattr(a, field, value)
+
+    if "deadline" in data and "deadline_dt" not in data:
+        a.deadline_dt = parse_deadline(data["deadline"])
+
     db.commit()
     db.refresh(a)
     return a
@@ -111,16 +155,15 @@ async def full_update_assignment(
     file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
-    """Full update of an assignment including optional file replacement."""
     a = _get_assignment_or_404(course_id, assignment_id, db)
 
     a.title = title
     a.description = description
     a.deadline = deadline
+    a.deadline_dt = parse_deadline(deadline)
     a.status = status
 
     if file and file.filename:
-        # Remove old file
         if a.file_path and os.path.exists(a.file_path):
             os.remove(a.file_path)
         contents = await file.read()

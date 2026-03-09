@@ -1,10 +1,10 @@
 """
-AI Router — endpoints backed by GigaChat
-─────────────────────────────────────────
+AI Router — endpoints backed by the workspace assistant
+──────────────────────────────────────────────────────
 POST /ai/chat                      — general chat (history-aware)
 POST /ai/courses/{id}/plan         — generate study plan for a course
 POST /ai/assignments/{id}/help     — get structured help for an assignment
-GET  /ai/models                    — list available GigaChat models
+GET  /ai/models                    — list available provider models
 """
 
 import os
@@ -21,10 +21,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
-# ── helpers ───────────────────────────────────────────────────
 
 def _extract_file_text(file_path: str | None, max_chars: int = 3000) -> str:
-    """Try to read text content from common file types."""
     if not file_path or not os.path.exists(file_path):
         return ""
     ext = os.path.splitext(file_path)[1].lower()
@@ -51,8 +49,6 @@ def _read_odt(path: str, max_chars: int) -> str:
             texts.append(elem.text)
     return " ".join(texts)[:max_chars]
 
-
-# ── Pydantic schemas ──────────────────────────────────────────
 
 class ChatMessage(BaseModel):
     role: str
@@ -85,8 +81,6 @@ class HelpResponse(BaseModel):
     advice: str
 
 
-# ── system prompts ────────────────────────────────────────────
-
 NO_DIRECT_ANSWERS = (
     "ВАЖНОЕ ПРАВИЛО: Ты НИКОГДА не даёшь готовых решений, ответов на задания, "
     "готового кода или прямых ответов на вопросы заданий. "
@@ -115,8 +109,6 @@ SYSTEM_HELP = (
 )
 
 
-# ── Endpoints ─────────────────────────────────────────────────
-
 @router.post("/chat", response_model=ChatResponse)
 async def ai_chat(req: ChatRequest):
     system = Message(role="system", content=SYSTEM_CHAT)
@@ -128,8 +120,8 @@ async def ai_chat(req: ChatRequest):
             max_tokens=req.max_tokens,
         )
     except Exception as exc:
-        logger.exception("GigaChat chat error")
-        raise HTTPException(502, f"GigaChat error: {exc}") from exc
+        logger.exception("AI chat error")
+        raise HTTPException(502, f"Ошибка AI-сервиса: {exc}") from exc
 
     return ChatResponse(reply=reply)
 
@@ -144,8 +136,6 @@ async def generate_study_plan(
     if not course:
         raise HTTPException(404, "Course not found")
 
-    # ── Build rich context ──
-    # Assignments
     all_assignments = course.assignments or []
     assignments_text = ""
     for a in all_assignments:
@@ -159,7 +149,6 @@ async def generate_study_plan(
     if not assignments_text.strip():
         assignments_text = "  (нет заданий)\n"
 
-    # Materials
     materials = course.materials or []
     materials_text = ""
     for m in materials:
@@ -195,13 +184,11 @@ async def generate_study_plan(
             max_tokens=2000,
         )
     except Exception as exc:
-        logger.exception("GigaChat plan error")
-        raise HTTPException(502, f"GigaChat error: {exc}") from exc
+        logger.exception("AI plan error")
+        raise HTTPException(502, f"Ошибка AI-сервиса: {exc}") from exc
 
-    # Save to DB
     course.ai_plan = plan
     db.commit()
-
     return PlanResponse(plan=plan)
 
 
@@ -218,7 +205,6 @@ async def assignment_help(
     course = db.get(models.Course, assignment.course_id)
     course_name = course.name if course else "неизвестный курс"
 
-    # Build context with file content
     file_context = ""
     file_content = _extract_file_text(assignment.file_path)
     if file_content:
@@ -248,13 +234,11 @@ async def assignment_help(
             max_tokens=1200,
         )
     except Exception as exc:
-        logger.exception("GigaChat help error")
-        raise HTTPException(502, f"GigaChat error: {exc}") from exc
+        logger.exception("AI help error")
+        raise HTTPException(502, f"Ошибка AI-сервиса: {exc}") from exc
 
-    # Save to DB
     assignment.ai_advice = advice
     db.commit()
-
     return HelpResponse(advice=advice)
 
 
@@ -263,4 +247,4 @@ async def get_models():
     try:
         return await list_models()
     except Exception as exc:
-        raise HTTPException(502, f"GigaChat error: {exc}") from exc
+        raise HTTPException(502, f"Ошибка AI-сервиса: {exc}") from exc

@@ -1,8 +1,7 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
-# ── User ──────────────────────────────────────────────────────
 class UserCreate(BaseModel):
     name: str
     initials: str
@@ -18,7 +17,6 @@ class UserOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ── Course ────────────────────────────────────────────────────
 class CourseCreate(BaseModel):
     name: str
     color: str = "#3d52d5"
@@ -50,13 +48,12 @@ class CourseOut(BaseModel):
     credits: int
     progress: float
     ai_plan: str | None = None
-    materials: list["MaterialOut"] = []
-    assignments: list["AssignmentOut"] = []
+    materials: list["MaterialOut"] = Field(default_factory=list)
+    assignments: list["AssignmentOut"] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
 
-# ── Material ──────────────────────────────────────────────────
 class MaterialOut(BaseModel):
     id: int
     course_id: int
@@ -70,7 +67,6 @@ class MaterialOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ── Assignment ────────────────────────────────────────────────
 class AssignmentCreate(BaseModel):
     title: str
     description: str = ""
@@ -93,9 +89,44 @@ class AssignmentOut(BaseModel):
     title: str
     description: str
     deadline: str
+    deadline_dt: datetime | None = None
     status: str
     file_name: str | None = None
     ai_advice: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ScheduleEventBase(BaseModel):
+    title: str
+    day_index: int
+    start_minute: int
+    duration_minutes: int = 90
+    location: str = ""
+    teacher: str = ""
+    type: str = "lecture"
+    color: str = "#3d52d5"
+
+
+class ScheduleEventCreate(ScheduleEventBase):
+    pass
+
+
+class ScheduleEventUpdate(BaseModel):
+    title: str | None = None
+    day_index: int | None = None
+    start_minute: int | None = None
+    duration_minutes: int | None = None
+    location: str | None = None
+    teacher: str | None = None
+    type: str | None = None
+    color: str | None = None
+
+
+class ScheduleEventOut(ScheduleEventBase):
+    id: int
+    user_id: int
     created_at: datetime
 
     model_config = {"from_attributes": True}

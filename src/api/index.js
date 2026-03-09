@@ -8,6 +8,7 @@ async function request(method, path, body = null) {
   } else if (body instanceof FormData) {
     opts.body = body
   }
+
   const res = await fetch(`${BASE}${path}`, opts)
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
@@ -18,19 +19,16 @@ async function request(method, path, body = null) {
 }
 
 export const api = {
-  // ── Users ────────────────────────────────────────────────
   getUser:    (id)   => request('GET',  `/users/${id}`),
   listUsers:  ()     => request('GET',  '/users/'),
   createUser: (data) => request('POST', '/users/', data),
 
-  // ── Courses ───────────────────────────────────────────────
   getCourses:    (userId)       => request('GET',    `/users/${userId}/courses`),
   getCourse:     (id)           => request('GET',    `/courses/${id}`),
   createCourse:  (userId, data) => request('POST',   `/courses/?user_id=${userId}`, data),
   updateCourse:  (id, data)     => request('PATCH',  `/courses/${id}`, data),
   deleteCourse:  (id)           => request('DELETE', `/courses/${id}`),
 
-  // ── Materials ─────────────────────────────────────────────
   getMaterials:  (courseId) => request('GET', `/courses/${courseId}/materials/`),
   uploadMaterial: (courseId, file) => {
     const fd = new FormData()
@@ -40,23 +38,24 @@ export const api = {
   deleteMaterial:      (courseId, matId) => request('DELETE', `/courses/${courseId}/materials/${matId}`),
   downloadMaterialUrl: (courseId, matId) => `${BASE}/courses/${courseId}/materials/${matId}/download`,
 
-  // ── Assignments ───────────────────────────────────────────
-  getAssignments:    (courseId)          => request('GET',    `/courses/${courseId}/assignments/`),
-  createAssignment:  (courseId, fd)      => request('POST',   `/courses/${courseId}/assignments/`, fd),
-  updateAssignment:  (courseId, id, data)=> request('PATCH',  `/courses/${courseId}/assignments/${id}`, data),
-  fullUpdateAssignment: (courseId, id, fd) => {
-    // PUT with FormData (file replacement supported)
-    return request('PUT', `/courses/${courseId}/assignments/${id}`, fd)
-  },
+  getAssignments:    (courseId)           => request('GET',   `/courses/${courseId}/assignments/`),
+  createAssignment:  (courseId, fd)       => request('POST',  `/courses/${courseId}/assignments/`, fd),
+  updateAssignment:  (courseId, id, data) => request('PATCH', `/courses/${courseId}/assignments/${id}`, data),
+  fullUpdateAssignment: (courseId, id, fd) =>
+    request('PUT', `/courses/${courseId}/assignments/${id}`, fd),
   deleteAssignment:  (courseId, id) => request('DELETE', `/courses/${courseId}/assignments/${id}`),
   downloadAssignmentUrl: (courseId, id) => `${BASE}/courses/${courseId}/assignments/${id}/download`,
 
-  // ── AI / GigaChat ─────────────────────────────────────────
+  getSchedule:       (userId)             => request('GET',   `/users/${userId}/schedule/`),
+  createSchedule:    (userId, data)       => request('POST',  `/users/${userId}/schedule/`, data),
+  updateSchedule:    (userId, id, data)   => request('PATCH', `/users/${userId}/schedule/${id}`, data),
+  deleteSchedule:    (userId, id)         => request('DELETE', `/users/${userId}/schedule/${id}`),
+
   aiChat: (messages, opts = {}) =>
     request('POST', '/ai/chat', {
       messages,
       temperature: opts.temperature ?? 0.7,
-      max_tokens:  opts.max_tokens  ?? 1024,
+      max_tokens: opts.max_tokens ?? 1024,
     }),
 
   aiGeneratePlan: (courseId, extraContext = '') =>

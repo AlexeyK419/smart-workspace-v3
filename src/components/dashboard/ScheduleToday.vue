@@ -2,47 +2,80 @@
   <div class="card">
     <div class="card-header">
       <div class="card-title">Расписание сегодня</div>
-      <button class="btn btn-ghost" style="padding: 5px 10px; font-size: 12px">Все</button>
+      <RouterLink to="/schedule" class="btn btn-ghost mini-link">Все</RouterLink>
     </div>
 
-    <div class="events-list">
-      <div v-for="ev in store.todayEvents" :key="ev.id" class="event-row">
-        <div class="event-time">{{ ev.time }}</div>
+    <div v-if="store.todayEvents.length" class="events-list">
+      <div v-for="event in store.todayEvents" :key="event.id" class="event-row">
+        <div class="event-time">{{ event.time }}</div>
         <div
           class="event-body"
           :style="{
-            borderLeftColor: ev.color,
-            background: ev.color + '18',
+            borderLeftColor: event.color,
+            background: event.color + '18',
           }"
         >
-          <div class="event-title">{{ ev.title }}</div>
-          <div class="event-location">{{ ev.location }}</div>
+          <div class="event-title">{{ event.title }}</div>
+          <div class="event-location">{{ event.location || 'Место не указано' }}</div>
         </div>
       </div>
+    </div>
+
+    <div v-else class="empty-state">
+      На сегодня занятий нет. Добавь их на странице расписания, и они появятся здесь автоматически.
     </div>
   </div>
 </template>
 
 <script setup>
+import { RouterLink } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
+
 const store = useWorkspaceStore()
 </script>
 
 <style scoped>
-.events-list { display: flex; flex-direction: column; gap: 10px; }
-
-.event-row { display: flex; gap: 12px; align-items: flex-start; }
-
+.mini-link {
+  padding: 5px 10px;
+  font-size: 12px;
+  text-decoration: none;
+}
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.event-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
 .event-time {
-  font-size: 11px; color: var(--text-muted);
-  width: 44px; flex-shrink: 0; margin-top: 2px; font-weight: 500;
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 44px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-weight: 600;
 }
-
 .event-body {
-  flex: 1; padding: 10px 12px;
-  border-radius: 8px; border-left: 3px solid;
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border-left: 3px solid;
 }
-
-.event-title    { font-size: 13px; font-weight: 600; }
-.event-location { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+.event-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.event-location {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.empty-state {
+  padding: 10px 0 2px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
 </style>
