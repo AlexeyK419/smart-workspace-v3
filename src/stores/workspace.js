@@ -18,10 +18,36 @@ function normalizeScheduleEvent(event) {
   }
 }
 
+function normalizeProjectTask(task) {
+  return {
+    ...task,
+    dueDate: task?.due_date ? new Date(task.due_date) : null,
+  }
+}
+
+function normalizeProject(project) {
+  return {
+    ...project,
+    tasks: [...(project.tasks || [])]
+      .map(normalizeProjectTask)
+      .sort((a, b) => {
+        const aTime = a.dueDate?.getTime?.() ?? Number.POSITIVE_INFINITY
+        const bTime = b.dueDate?.getTime?.() ?? Number.POSITIVE_INFINITY
+        return aTime - bTime
+      }),
+    files: [...(project.files || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
+    members: [...(project.members || [])].sort((a, b) => {
+      if (a.role === b.role) return a.user.name.localeCompare(b.user.name, 'ru')
+      return a.role === 'owner' ? -1 : 1
+    }),
+  }
+}
+
 export const useWorkspaceStore = defineStore('workspace', () => {
   const authStore = useAuthStore()
   const courses = ref([])
   const scheduleEvents = ref([])
+  const projects = ref([])
   const isLoading = ref(false)
   const toast = ref('')
 
@@ -68,9 +94,42 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       }))
   })
 
+  const projectTasks = computed(() => {
+    const items = []
+    projects.value.forEach((project) => {
+      ;(project.tasks || []).forEach((task) => {
+        items.push({
+          ...task,
+          projectId: project.id,
+          projectName: project.name,
+          projectColor: project.color,
+        })
+      })
+    })
+    return items.sort((a, b) => {
+      const aTime = a.dueDate?.getTime?.() ?? Number.POSITIVE_INFINITY
+      const bTime = b.dueDate?.getTime?.() ?? Number.POSITIVE_INFINITY
+      return aTime - bTime
+    })
+  })
+
+  const pendingProjectTasks = computed(() =>
+    projectTasks.value.filter((task) => task.status !== 'done')
+  )
+
+  function replaceProject(project) {
+    const normalized = normalizeProject(project)
+    const idx = projects.value.findIndex((item) => item.id === normalized.id)
+    if (idx === -1) projects.value.unshift(normalized)
+    else projects.value[idx] = normalized
+    projects.value = [...projects.value].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    return normalized
+  }
+
   function resetWorkspace() {
     courses.value = []
     scheduleEvents.value = []
+    projects.value = []
   }
 
   async function fetchCourses() {
@@ -100,6 +159,28 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       scheduleEvents.value = events.map(normalizeScheduleEvent)
     } catch (e) {
       showToast('Ошибка загрузки расписания: ' + e.message)
+    }
+  }
+
+  async function fetchProjects() {
+    if (!authStore.isAuthenticated) {
+      projects.value = []
+      return
+    }
+
+    try {
+      projects.value = (await api.getProjects()).map(normalizeProject)
+    } catch (e) {
+      showToast('Ошибка загрузки проектов: ' + e.message)
+    }
+  }
+
+  async function fetchProject(projectId) {
+    try {
+      return replaceProject(await api.getProject(projectId))
+    } catch (e) {
+      showToast('Ошибка загрузки проекта: ' + e.message)
+      throw e
     }
   }
 
@@ -249,13 +330,182 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
+  async function createProject(payload) {
+    try {
+      const created = await api.createProject(payload)
+      const normalized = replaceProject(created)
+      showToast('Проект создан')
+      return normalized
+    } catch (e) {
+      showToast('Ошибка создания проекта: ' + e.message)
+      throw e
+    }
+  }
+
+  async function updateProject(projectId, payload) {
+    try {
+      const updated = replaceProject(await api.updateProject(projectId, payload))
+      showToast('Проект обновлён')
+      return updated
+    } catch (e) {
+      showToast('Ошибка обновления проекта: ' + e.message)
+      throw e
+    }
+  }
+
+  async function deleteProject(projectId) {
+    try {
+      await api.deleteProject(projectId)
+      projects.value = projects.value.filter((project) => project.id !== projectId)
+      showToast('Проект удалён')
+    } catch (e) {
+      showToast('Ошибка удаления проекта: ' + e.message)
+      throw e
+    }
+  }
+
+  async function searchUsers(query) {
+    if (!query?.trim()) return []
+    try {
+      return await api.searchUsers(query.trim())
+    } catch (e) {
+      showToast('Ошибка поиска пользователей: ' + e.message)
+      return []
+    }
+  }
+
+  async function addProjectMember(projectId, payload) {
+    try {
+      const project = replaceProject(await api.addProjectMember(projectId, payload))
+      showToast('Участник добавлен')
+      return project
+    } catch (e) {
+      showToast('Ошибка добавления участника: ' + e.message)
+      throw e
+    }
+  }
+
+  async function removeProjectMember(projectId, memberId) {
+    try {
+      const project = replaceProject(await api.removeProjectMember(projectId, memberId))
+      showToast('Участник удалён')
+      return project
+    } catch (e) {
+      showToast('Ошибка удаления участника: ' + e.message)
+      throw e
+    }
+  }
+
+  async function createProjectTask(projectId, payload) {
+    try {
+      const task = normalizeProjectTask(await api.createProjectTask(projectId, payload))
+      const project = projects.value.find((item) => item.id === projectId)
+      if (project) {
+        project.tasks = [...(project.tasks || []), task].sort((a, b) => {
+          const aTime = a.dueDate?.getTime?.() ?? Number.POSITIVE_INFINITY
+          const bTime = b.dueDate?.getTime?.() ?? Number.POSITIVE_INFINITY
+          return aTime - bTime
+        })
+      }
+      showToast('Задача добавлена')
+      return task
+    } catch (e) {
+      showToast('Ошибка создания задачи: ' + e.message)
+      throw e
+    }
+  }
+
+  async function updateProjectTask(projectId, taskId, payload) {
+    try {
+      const updated = normalizeProjectTask(await api.updateProjectTask(projectId, taskId, payload))
+      const project = projects.value.find((item) => item.id === projectId)
+      if (project) {
+        const idx = (project.tasks || []).findIndex((task) => task.id === taskId)
+        if (idx !== -1) project.tasks[idx] = updated
+        project.tasks = [...(project.tasks || [])].sort((a, b) => {
+          const aTime = a.dueDate?.getTime?.() ?? Number.POSITIVE_INFINITY
+          const bTime = b.dueDate?.getTime?.() ?? Number.POSITIVE_INFINITY
+          return aTime - bTime
+        })
+      }
+      showToast('Задача обновлена')
+      return updated
+    } catch (e) {
+      showToast('Ошибка обновления задачи: ' + e.message)
+      throw e
+    }
+  }
+
+  async function deleteProjectTask(projectId, taskId) {
+    try {
+      await api.deleteProjectTask(projectId, taskId)
+      const project = projects.value.find((item) => item.id === projectId)
+      if (project) project.tasks = (project.tasks || []).filter((task) => task.id !== taskId)
+      showToast('Задача удалена')
+    } catch (e) {
+      showToast('Ошибка удаления задачи: ' + e.message)
+      throw e
+    }
+  }
+
+  async function uploadProjectFile(projectId, file) {
+    try {
+      const uploaded = await api.uploadProjectFile(projectId, file)
+      const project = projects.value.find((item) => item.id === projectId)
+      if (project) project.files = [uploaded, ...(project.files || [])]
+      showToast('Файл проекта загружен')
+      return uploaded
+    } catch (e) {
+      showToast('Ошибка загрузки файла: ' + e.message)
+      throw e
+    }
+  }
+
+  async function deleteProjectFile(projectId, fileId) {
+    try {
+      await api.deleteProjectFile(projectId, fileId)
+      const project = projects.value.find((item) => item.id === projectId)
+      if (project) project.files = (project.files || []).filter((file) => file.id !== fileId)
+      showToast('Файл удалён')
+    } catch (e) {
+      showToast('Ошибка удаления файла: ' + e.message)
+      throw e
+    }
+  }
+
+  async function fetchProjectMessages(projectId) {
+    try {
+      return await api.getProjectMessages(projectId)
+    } catch (e) {
+      showToast('Ошибка загрузки чата: ' + e.message)
+      throw e
+    }
+  }
+
+  async function postProjectMessage(projectId, body) {
+    try {
+      const message = await api.postProjectMessage(projectId, { body })
+      showToast('Сообщение отправлено')
+      return message
+    } catch (e) {
+      showToast('Ошибка отправки сообщения: ' + e.message)
+      throw e
+    }
+  }
+
   function showToast(message) {
     toast.value = message
-    setTimeout(() => (toast.value = ''), 2800)
+    setTimeout(() => {
+      if (toast.value === message) toast.value = ''
+    }, 2800)
   }
 
   function statusLabel(status) {
     return { pending: 'Ожидает', progress: 'В процессе', done: 'Сдано', overdue: 'Просрочено' }[status] ?? status
+  }
+
+  function projectTaskStatusLabel(status) {
+    return { todo: 'К выполнению', in_progress: 'В работе', done: 'Готово' }[status] ?? status
   }
 
   function urgencyClass(deadline) {
@@ -277,12 +527,17 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     currentUser,
     courses,
     scheduleEvents,
+    projects,
     isLoading,
     toast,
     allAssignments,
     todayEvents,
+    projectTasks,
+    pendingProjectTasks,
     fetchCourses,
     fetchSchedule,
+    fetchProjects,
+    fetchProject,
     resetWorkspace,
     addCourse,
     updateCourse,
@@ -296,8 +551,22 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     createScheduleEvent,
     updateScheduleEvent,
     deleteScheduleEvent,
+    createProject,
+    updateProject,
+    deleteProject,
+    searchUsers,
+    addProjectMember,
+    removeProjectMember,
+    createProjectTask,
+    updateProjectTask,
+    deleteProjectTask,
+    uploadProjectFile,
+    deleteProjectFile,
+    fetchProjectMessages,
+    postProjectMessage,
     showToast,
     statusLabel,
+    projectTaskStatusLabel,
     urgencyClass,
     humanSize,
   }

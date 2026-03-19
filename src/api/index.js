@@ -15,7 +15,6 @@ export function getAuthToken() {
   return authToken
 }
 
-
 function getFilenameFromDisposition(header) {
   const match = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(header || '')
   const raw = match?.[1] || match?.[2] || ''
@@ -77,6 +76,7 @@ export const api = {
 
   getCurrentUser: () => request('GET', '/users/me'),
   getCourses:     () => request('GET', '/users/me/courses'),
+  searchUsers:    (query) => request('GET', `/users/search?q=${encodeURIComponent(query)}`),
 
   getCourse:     (id)   => request('GET',    `/courses/${id}`),
   createCourse:  (data) => request('POST',   '/courses/', data),
@@ -103,6 +103,27 @@ export const api = {
   createSchedule:    (data)     => request('POST',  '/schedule/', data),
   updateSchedule:    (id, data) => request('PATCH', `/schedule/${id}`, data),
   deleteSchedule:    (id)       => request('DELETE', `/schedule/${id}`),
+
+  getProjects:       ()         => request('GET', '/projects/'),
+  getProject:        (id)       => request('GET', `/projects/${id}`),
+  createProject:     (data)     => request('POST', '/projects/', data),
+  updateProject:     (id, data) => request('PATCH', `/projects/${id}`, data),
+  deleteProject:     (id)       => request('DELETE', `/projects/${id}`),
+  addProjectMember:  (projectId, data) => request('POST', `/projects/${projectId}/members`, data),
+  removeProjectMember: (projectId, memberId) => request('DELETE', `/projects/${projectId}/members/${memberId}`),
+  createProjectTask: (projectId, data) => request('POST', `/projects/${projectId}/tasks`, data),
+  updateProjectTask: (projectId, taskId, data) => request('PATCH', `/projects/${projectId}/tasks/${taskId}`, data),
+  deleteProjectTask: (projectId, taskId) => request('DELETE', `/projects/${projectId}/tasks/${taskId}`),
+  getProjectMessages: (projectId) => request('GET', `/projects/${projectId}/messages`),
+  postProjectMessage: (projectId, data) => request('POST', `/projects/${projectId}/messages`, data),
+  getProjectFiles:    (projectId) => request('GET', `/projects/${projectId}/files`),
+  uploadProjectFile:  (projectId, file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request('POST', `/projects/${projectId}/files`, fd)
+  },
+  deleteProjectFile:  (projectId, fileId) => request('DELETE', `/projects/${projectId}/files/${fileId}`),
+  downloadProjectFile: (projectId, fileId, fileName = 'project-file') => downloadWithAuth(`/projects/${projectId}/files/${fileId}/download`, fileName),
 
   aiChat: (messages, opts = {}) =>
     request('POST', '/ai/chat', {

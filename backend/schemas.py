@@ -49,23 +49,6 @@ class CourseUpdate(BaseModel):
     progress: float | None = None
 
 
-class CourseOut(BaseModel):
-    id: int
-    user_id: int
-    name: str
-    color: str
-    emoji: str
-    teacher: str
-    semester: str
-    credits: int
-    progress: float
-    ai_plan: str | None = None
-    materials: list["MaterialOut"] = Field(default_factory=list)
-    assignments: list["AssignmentOut"] = Field(default_factory=list)
-
-    model_config = {"from_attributes": True}
-
-
 class MaterialOut(BaseModel):
     id: int
     course_id: int
@@ -110,6 +93,23 @@ class AssignmentOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CourseOut(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    color: str
+    emoji: str
+    teacher: str
+    semester: str
+    credits: int
+    progress: float
+    ai_plan: str | None = None
+    materials: list[MaterialOut] = Field(default_factory=list)
+    assignments: list[AssignmentOut] = Field(default_factory=list)
+
+    model_config = {"from_attributes": True}
+
+
 class ScheduleEventBase(BaseModel):
     title: str
     day_index: int
@@ -140,5 +140,110 @@ class ScheduleEventOut(ScheduleEventBase):
     id: int
     user_id: int
     created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: str = ""
+    color: str = "#3d52d5"
+
+
+class ProjectUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    color: str | None = None
+
+
+class ProjectMemberAddRequest(BaseModel):
+    user_id: int | None = None
+    email: str | None = None
+
+
+class ProjectTaskCreate(BaseModel):
+    title: str
+    description: str = ""
+    status: str = "todo"
+    due_date: datetime | None = None
+    assignee_id: int | None = None
+
+
+class ProjectTaskUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    status: str | None = None
+    due_date: datetime | None = None
+    assignee_id: int | None = None
+
+
+class ProjectMessageCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
+
+
+class ProjectMemberOut(BaseModel):
+    id: int
+    project_id: int
+    user_id: int
+    role: str
+    created_at: datetime
+    user: UserOut
+
+    model_config = {"from_attributes": True}
+
+
+class ProjectTaskOut(BaseModel):
+    id: int
+    project_id: int
+    title: str
+    description: str
+    status: str
+    due_date: datetime | None = None
+    assignee_id: int | None = None
+    created_by_id: int
+    created_at: datetime
+    assignee: UserOut | None = None
+    creator: UserOut | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ProjectFileOut(BaseModel):
+    id: int
+    project_id: int
+    uploader_id: int
+    name: str
+    size_bytes: int
+    mime_type: str
+    icon: str
+    icon_bg: str
+    created_at: datetime
+    uploader: UserOut | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ProjectMessageOut(BaseModel):
+    id: int
+    project_id: int
+    author_id: int
+    body: str
+    created_at: datetime
+    author: UserOut | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ProjectOut(BaseModel):
+    id: int
+    owner_id: int
+    name: str
+    description: str
+    color: str
+    created_at: datetime
+    owner: UserOut | None = None
+    members: list[ProjectMemberOut] = Field(default_factory=list)
+    tasks: list[ProjectTaskOut] = Field(default_factory=list)
+    files: list[ProjectFileOut] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}

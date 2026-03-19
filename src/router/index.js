@@ -3,6 +3,8 @@ import DashboardPage from '@/pages/DashboardPage.vue'
 import CourseDetailPage from '@/pages/CourseDetailPage.vue'
 import SchedulePage from '@/pages/SchedulePage.vue'
 import WelcomePage from '@/pages/WelcomePage.vue'
+import ProjectsPage from '@/pages/ProjectsPage.vue'
+import ProjectDetailPage from '@/pages/ProjectDetailPage.vue'
 
 const routes = [
   {
@@ -28,6 +30,18 @@ const routes = [
     name: 'schedule',
     component: SchedulePage,
     meta: { breadcrumb: 'Расписание', requiresAuth: true },
+  },
+  {
+    path: '/projects',
+    name: 'projects',
+    component: ProjectsPage,
+    meta: { breadcrumb: 'Проекты', requiresAuth: true },
+  },
+  {
+    path: '/projects/:id',
+    name: 'project',
+    component: ProjectDetailPage,
+    meta: { breadcrumb: 'Проект', requiresAuth: true },
   },
   {
     path: '/:pathMatch(.*)*',

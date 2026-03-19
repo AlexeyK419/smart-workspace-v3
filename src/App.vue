@@ -51,7 +51,7 @@ watch(
     if (!isReady) return
 
     if (isAuthenticated) {
-      await Promise.all([store.fetchCourses(), store.fetchSchedule()])
+      await Promise.all([store.fetchCourses(), store.fetchSchedule(), store.fetchProjects()])
       if (route.meta.guestOnly) router.replace('/')
     } else {
       store.resetWorkspace()

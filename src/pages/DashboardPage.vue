@@ -13,6 +13,7 @@
       <div class="dashboard-side">
         <ScheduleToday />
         <UpcomingAssignments />
+        <ProjectsOverview />
       </div>
     </div>
   </div>
@@ -25,6 +26,7 @@ import StatsRow from '@/components/dashboard/StatsRow.vue'
 import CalendarWidget from '@/components/dashboard/CalendarWidget.vue'
 import ScheduleToday from '@/components/dashboard/ScheduleToday.vue'
 import UpcomingAssignments from '@/components/dashboard/UpcomingAssignments.vue'
+import ProjectsOverview from '@/components/dashboard/ProjectsOverview.vue'
 
 const store = useWorkspaceStore()
 

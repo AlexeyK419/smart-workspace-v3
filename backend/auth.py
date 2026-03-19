@@ -84,3 +84,26 @@ def get_assignment_for_user_or_404(assignment_id: int, user_id: int, db: Session
     if not assignment:
         raise HTTPException(status_code=404, detail="Задание не найдено")
     return assignment
+
+
+def get_project_for_user_or_404(project_id: int, user_id: int, db: Session) -> models.Project:
+    project = (
+        db.query(models.Project)
+        .join(models.ProjectMember, models.ProjectMember.project_id == models.Project.id)
+        .filter(models.Project.id == project_id, models.ProjectMember.user_id == user_id)
+        .first()
+    )
+    if not project:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    return project
+
+
+def ensure_project_owner(project_id: int, user_id: int, db: Session) -> models.ProjectMember:
+    membership = (
+        db.query(models.ProjectMember)
+        .filter(models.ProjectMember.project_id == project_id, models.ProjectMember.user_id == user_id)
+        .first()
+    )
+    if not membership or membership.role != "owner":
+        raise HTTPException(status_code=403, detail="Только владелец проекта может выполнять это действие")
+    return membership

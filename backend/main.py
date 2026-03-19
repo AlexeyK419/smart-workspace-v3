@@ -1,10 +1,11 @@
 """
-Smart Student Workspace — FastAPI backend v4
+Smart Student Workspace — FastAPI backend v5
   • PostgreSQL via SQLAlchemy 2
   • token-based auth (register/login/me)
   • per-user data isolation
+  • team projects with tasks, files and chat
   • AI assistant integration
-  • file uploads (materials + assignments)
+  • file uploads (materials + assignments + project files)
 """
 
 import logging
@@ -19,7 +20,7 @@ from auth import compute_initials, hash_password
 from config import settings
 from database import engine, SessionLocal
 import models
-from routers import auth, users, courses, materials, assignments, ai, schedule
+from routers import auth, users, courses, materials, assignments, ai, schedule, projects
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -222,22 +223,79 @@ def seed():
         db.close()
 
 
+def seed_projects():
+    db = SessionLocal()
+    try:
+        demo_user = db.query(models.User).filter(models.User.email == "demo@workspace.local").first()
+        if not demo_user:
+            return
+
+        existing = (
+            db.query(models.ProjectMember)
+            .filter(models.ProjectMember.user_id == demo_user.id)
+            .count()
+        )
+        if existing:
+            return
+
+        project = models.Project(
+            owner_id=demo_user.id,
+            name="Командный учебный проект",
+            description="Пространство для совместной работы над групповым проектом: задачи, файлы и общий чат.",
+            color="#7c3aed",
+        )
+        db.add(project)
+        db.flush()
+
+        db.add(models.ProjectMember(project_id=project.id, user_id=demo_user.id, role="owner"))
+        db.add_all([
+            models.ProjectTask(
+                project_id=project.id,
+                title="Собрать требования по MVP",
+                description="Зафиксировать роли, разделить функциональность и подготовить список ближайших задач.",
+                status="in_progress",
+                created_by_id=demo_user.id,
+                assignee_id=demo_user.id,
+                due_date=datetime(2025, 3, 24, 18, 0),
+            ),
+            models.ProjectTask(
+                project_id=project.id,
+                title="Подготовить презентацию демо",
+                description="Сделать короткую презентацию по целям проекта и пользовательским сценариям.",
+                status="todo",
+                created_by_id=demo_user.id,
+                due_date=datetime(2025, 3, 28, 12, 0),
+            ),
+        ])
+        db.add(models.ProjectMessage(
+            project_id=project.id,
+            author_id=demo_user.id,
+            body="Добро пожаловать в командный проект. Здесь можно обсуждать задачи, хранить файлы и распределять работу.",
+        ))
+        db.commit()
+        logger.info("Demo team project inserted")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     upgrade_schema()
     upgrade_legacy_users_auth()
     seed()
+    seed_projects()
     yield
 
 
 app = FastAPI(
     title="Smart Student Workspace API",
-    version="4.0.0",
+    version="5.0.0",
     description=(
         "REST API for the student workspace diploma project.\n\n"
         "**Database:** PostgreSQL\n"
         "**Authentication:** bearer token\n"
+        "**Collaboration:** team projects, tasks, files and chat\n"
         "**Assistant:** Workspace AI\n"
     ),
     lifespan=lifespan,
@@ -257,9 +315,5 @@ app.include_router(courses.router)
 app.include_router(materials.router)
 app.include_router(assignments.router)
 app.include_router(schedule.router)
+app.include_router(projects.router)
 app.include_router(ai.router)
-
-
-@app.get("/health", tags=["system"])
-def health():
-    return {"status": "ok", "db": settings.database_url.split("@")[-1]}

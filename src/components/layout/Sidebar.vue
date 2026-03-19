@@ -13,7 +13,7 @@
     <nav class="sidebar-nav">
       <div class="nav-section-label">Навигация</div>
 
-      <RouterLink to="/" class="nav-item" active-class="active" exact>
+      <RouterLink to="/" class="nav-item" active-class="active">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
         Главная
       </RouterLink>
@@ -23,12 +23,17 @@
         Расписание
       </RouterLink>
 
+      <RouterLink to="/projects" class="nav-item" active-class="active">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        Проекты
+      </RouterLink>
+
       <div class="nav-section-label" style="margin-top: 8px">Курсы</div>
 
       <div class="courses-header" @click="coursesOpen = !coursesOpen">
         <div class="courses-header-left">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;opacity:.7">
-            <path d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z"/>
+            <path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3Zm0 13L4.74 12 12 8.04 19.26 12 12 16Zm-7 1.5V14l7 3.82L19 14v3.5L12 21l-7-3.5Z"/>
           </svg>
           Мои курсы
         </div>
@@ -55,6 +60,26 @@
           </svg>
           Добавить курс
         </button>
+      </div>
+
+      <div class="nav-section-label" style="margin-top: 8px">Командная работа</div>
+
+      <div class="project-list">
+        <RouterLink
+          v-for="project in previewProjects"
+          :key="project.id"
+          :to="`/projects/${project.id}`"
+          class="project-item"
+          active-class="active"
+        >
+          <div class="project-dot" :style="{ background: project.color }"></div>
+          <div class="project-copy">
+            <span>{{ project.name }}</span>
+            <small>{{ project.members?.length || 0 }} участников</small>
+          </div>
+        </RouterLink>
+
+        <RouterLink to="/projects" class="project-more">Все проекты</RouterLink>
       </div>
 
       <div class="nav-section-label" style="margin-top: 8px">Другое</div>
@@ -85,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, inject } from 'vue'
+import { ref, inject, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useAuthStore } from '@/stores/auth'
@@ -95,6 +120,8 @@ const authStore = useAuthStore()
 const router = useRouter()
 const coursesOpen = ref(true)
 const openAddCourse = inject('openAddCourse')
+
+const previewProjects = computed(() => store.projects.slice(0, 4))
 
 async function logout() {
   await authStore.logout()
@@ -209,9 +236,7 @@ async function logout() {
   transition: background var(--transition);
   user-select: none;
 }
-.courses-header:hover {
-  background: var(--surface-2);
-}
+.courses-header:hover { background: var(--surface-2); }
 .courses-header-left {
   display: flex;
   align-items: center;
@@ -223,21 +248,17 @@ async function logout() {
   color: var(--text-muted);
   transition: transform var(--transition);
 }
-.chevron.open {
-  transform: rotate(90deg);
-}
+.chevron.open { transform: rotate(90deg); }
 .courses-list {
   overflow: hidden;
   transition: max-height .2s ease;
 }
-.courses-list.expanded {
-  max-height: 500px;
-}
-.courses-list.collapsed {
-  max-height: 0;
-}
+.courses-list.expanded { max-height: 500px; }
+.courses-list.collapsed { max-height: 0; }
 .course-item,
-.add-course-btn {
+.add-course-btn,
+.project-item,
+.project-more {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -252,69 +273,82 @@ async function logout() {
   cursor: pointer;
 }
 .course-item:hover,
-.add-course-btn:hover {
+.add-course-btn:hover,
+.project-item:hover,
+.project-more:hover {
   background: var(--surface-2);
 }
-.course-item.active {
+.course-item.active,
+.project-item.active {
   color: var(--accent);
   background: var(--accent-light);
 }
-.course-dot {
+.course-dot,
+.project-dot {
   width: 8px;
   height: 8px;
-  border-radius: 999px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
-.add-course-btn {
-  width: calc(100% - 52px);
-  border: 1px dashed var(--border);
+.project-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
+.project-copy span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.project-copy small,
+.project-more {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.project-list { display: grid; }
 .sidebar-profile {
-  border-top: 1px solid var(--border-soft);
   padding: 16px;
+  border-top: 1px solid var(--border-soft);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 .avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   background: var(--accent-light);
   color: var(--accent);
   display: grid;
   place-items: center;
   font-weight: 700;
+  flex-shrink: 0;
 }
-.profile-info {
-  min-width: 0;
-  flex: 1;
-}
+.profile-info { min-width: 0; }
 .profile-name {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .profile-role {
+  font-size: 11px;
   color: var(--text-muted);
-  font-size: 12px;
-  margin-top: 2px;
 }
 .logout-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: transparent;
+  cursor: pointer;
   display: grid;
   place-items: center;
-  cursor: pointer;
 }
-.logout-btn:hover {
-  background: var(--surface-2);
-}
+.logout-btn:hover { background: var(--surface-2); }
 .logout-btn svg {
   width: 16px;
   height: 16px;

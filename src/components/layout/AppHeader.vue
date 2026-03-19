@@ -17,6 +17,16 @@
       <template v-else-if="route.name === 'schedule'">
         <span class="breadcrumb-current">Расписание</span>
       </template>
+
+      <template v-else-if="route.name === 'projects'">
+        <span class="breadcrumb-current">Командные проекты</span>
+      </template>
+
+      <template v-else-if="route.name === 'project' && currentProject">
+        <RouterLink to="/projects" class="breadcrumb-item">Проекты</RouterLink>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">{{ currentProject.name }}</span>
+      </template>
     </div>
 
     <div class="header-right">
@@ -40,6 +50,10 @@ const store = useWorkspaceStore()
 
 const currentCourse = computed(() =>
   store.courses.find((c) => String(c.id) === String(route.params.id))
+)
+
+const currentProject = computed(() =>
+  store.projects.find((project) => String(project.id) === String(route.params.id))
 )
 </script>
 

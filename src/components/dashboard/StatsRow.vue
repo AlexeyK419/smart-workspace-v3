@@ -20,15 +20,18 @@ import { useWorkspaceStore } from '@/stores/workspace'
 const store = useWorkspaceStore()
 
 const stats = computed(() => {
-  const total      = store.courses.length
-  const urgent     = store.allAssignments.filter((a) => a.status !== 'done').length
-  const avgProgress = Math.round(
-    store.courses.reduce((acc, c) => acc + c.progress, 0) / store.courses.length
-  )
+  const totalCourses = store.courses.length
+  const openAssignments = store.allAssignments.filter((a) => a.status !== 'done').length
+  const totalProjects = store.projects.length
+  const avgProgress = store.courses.length
+    ? Math.round(store.courses.reduce((acc, c) => acc + c.progress, 0) / store.courses.length)
+    : 0
+
   return [
-    { value: total,        label: 'Активных курса',  color: 'var(--accent)',  sub: '+1 новый на этой неделе' },
-    { value: urgent,       label: 'Заданий',          color: 'var(--warning)', sub: '3 срочных' },
-    { value: avgProgress + '%', label: 'Прогресс',   color: 'var(--success)', progress: avgProgress },
+    { value: totalCourses, label: 'Активных курса', color: 'var(--accent)', sub: 'Личное обучение' },
+    { value: openAssignments, label: 'Личных дедлайнов', color: 'var(--warning)', sub: 'По вашим предметам' },
+    { value: totalProjects, label: 'Командных проектов', color: '#7c3aed', sub: `${store.pendingProjectTasks.length} открытых задач` },
+    { value: avgProgress + '%', label: 'Средний прогресс', color: 'var(--success)', progress: avgProgress },
   ]
 })
 </script>
@@ -36,7 +39,7 @@ const stats = computed(() => {
 <style scoped>
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -68,5 +71,11 @@ const stats = computed(() => {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 6px;
+}
+
+@media (max-width: 1150px) {
+  .stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>
