@@ -1,45 +1,45 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
+
+from auth import get_current_user
 from database import get_db
-import models, schemas
+import models
+import schemas
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("/", response_model=list[schemas.UserOut])
-def list_users(db: Session = Depends(get_db)):
-    return db.query(models.User).all()
+@router.get("/me", response_model=schemas.UserOut)
+def get_current_profile(current_user: models.User = Depends(get_current_user)):
+    return current_user
 
 
-@router.post("/", response_model=schemas.UserOut, status_code=201)
-def create_user(payload: schemas.UserCreate, db: Session = Depends(get_db)):
-    user = models.User(**payload.model_dump())
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+@router.get("/me/courses", response_model=list[schemas.CourseOut])
+def get_current_user_courses(current_user: models.User = Depends(get_current_user)):
+    return current_user.courses
 
 
-@router.get("/{user_id}", response_model=schemas.UserOut)
-def get_user(user_id: int, db: Session = Depends(get_db)):
-    user = db.get(models.User, user_id)
-    if not user:
-        raise HTTPException(404, "User not found")
-    return user
+@router.get("/search", response_model=list[schemas.UserOut])
+def search_users(
+    q: str = Query(default=""),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    term = f"%{q.strip().lower()}%"
+    if not q.strip():
+        return []
 
-
-@router.get("/{user_id}/courses", response_model=list[schemas.CourseOut])
-def get_user_courses(user_id: int, db: Session = Depends(get_db)):
-    user = db.get(models.User, user_id)
-    if not user:
-        raise HTTPException(404, "User not found")
-    return user.courses
-
-
-@router.delete("/{user_id}", status_code=204)
-def delete_user(user_id: int, db: Session = Depends(get_db)):
-    user = db.get(models.User, user_id)
-    if not user:
-        raise HTTPException(404, "User not found")
-    db.delete(user)
-    db.commit()
+    return (
+        db.query(models.User)
+        .filter(models.User.id != current_user.id)
+        .filter(
+            or_(
+                func.lower(models.User.name).like(term),
+                func.lower(func.coalesce(models.User.email, "")).like(term),
+            )
+        )
+        .order_by(models.User.name.asc())
+        .limit(12)
+        .all()
+    )

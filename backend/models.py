@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Integer, String, Text, DateTime, ForeignKey, Float
+from sqlalchemy import Integer, String, Text, DateTime, ForeignKey, Float, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
@@ -7,43 +7,89 @@ from database import Base
 class User(Base):
     __tablename__ = "users"
 
-    id:       Mapped[int]  = mapped_column(Integer, primary_key=True, index=True)
-    name:     Mapped[str]  = mapped_column(String(120))
-    initials: Mapped[str]  = mapped_column(String(10))
-    role:     Mapped[str]  = mapped_column(String(120), default="Студент")
+    id:            Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name:          Mapped[str] = mapped_column(String(120))
+    initials:      Mapped[str] = mapped_column(String(10))
+    role:          Mapped[str] = mapped_column(String(120), default="Студент")
+    email:         Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    password_salt: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    auth_token:    Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
 
     courses: Mapped[list["Course"]] = relationship("Course", back_populates="user", cascade="all, delete-orphan")
+    schedule_events: Mapped[list["ScheduleEvent"]] = relationship(
+        "ScheduleEvent",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    owned_projects: Mapped[list["Project"]] = relationship(
+        "Project",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+        foreign_keys="Project.owner_id",
+    )
+    project_memberships: Mapped[list["ProjectMember"]] = relationship(
+        "ProjectMember",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    assigned_project_tasks: Mapped[list["ProjectTask"]] = relationship(
+        "ProjectTask",
+        back_populates="assignee",
+        foreign_keys="ProjectTask.assignee_id",
+    )
+    created_project_tasks: Mapped[list["ProjectTask"]] = relationship(
+        "ProjectTask",
+        back_populates="creator",
+        foreign_keys="ProjectTask.created_by_id",
+    )
+    project_task_comments: Mapped[list["ProjectTaskComment"]] = relationship(
+        "ProjectTaskComment",
+        back_populates="author",
+        foreign_keys="ProjectTaskComment.author_id",
+    )
+    uploaded_project_files: Mapped[list["ProjectFile"]] = relationship(
+        "ProjectFile",
+        back_populates="uploader",
+        foreign_keys="ProjectFile.uploader_id",
+    )
+    project_messages: Mapped[list["ProjectMessage"]] = relationship(
+        "ProjectMessage",
+        back_populates="author",
+        foreign_keys="ProjectMessage.author_id",
+    )
 
 
 class Course(Base):
     __tablename__ = "courses"
 
-    id:       Mapped[int]   = mapped_column(Integer, primary_key=True, index=True)
-    user_id:  Mapped[int]   = mapped_column(Integer, ForeignKey("users.id"))
-    name:     Mapped[str]   = mapped_column(String(200))
-    color:    Mapped[str]   = mapped_column(String(20), default="#3d52d5")
-    emoji:    Mapped[str]   = mapped_column(String(10), default="📚")
-    teacher:  Mapped[str]   = mapped_column(String(200), default="")
-    semester: Mapped[str]   = mapped_column(String(100), default="")
-    credits:  Mapped[int]   = mapped_column(Integer, default=3)
-    progress: Mapped[float] = mapped_column(Float, default=0.0)
+    id:        Mapped[int]   = mapped_column(Integer, primary_key=True, index=True)
+    user_id:   Mapped[int]   = mapped_column(Integer, ForeignKey("users.id"))
+    name:      Mapped[str]   = mapped_column(String(200))
+    color:     Mapped[str]   = mapped_column(String(20), default="#3d52d5")
+    emoji:     Mapped[str]   = mapped_column(String(10), default="📘")
+    teacher:   Mapped[str]   = mapped_column(String(200), default="")
+    semester:  Mapped[str]   = mapped_column(String(100), default="")
+    credits:   Mapped[int]   = mapped_column(Integer, default=3)
+    progress:  Mapped[float] = mapped_column(Float, default=0.0)
+    ai_plan:   Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
     user:        Mapped["User"]             = relationship("User", back_populates="courses")
-    materials:   Mapped[list["Material"]]   = relationship("Material",   back_populates="course", cascade="all, delete-orphan")
+    materials:   Mapped[list["Material"]]   = relationship("Material", back_populates="course", cascade="all, delete-orphan")
     assignments: Mapped[list["Assignment"]] = relationship("Assignment", back_populates="course", cascade="all, delete-orphan")
 
 
 class Material(Base):
     __tablename__ = "materials"
 
-    id:         Mapped[int]  = mapped_column(Integer, primary_key=True, index=True)
-    course_id:  Mapped[int]  = mapped_column(Integer, ForeignKey("courses.id"))
-    name:       Mapped[str]  = mapped_column(String(300))
-    file_path:  Mapped[str]  = mapped_column(String(500))   # path on disk
-    size_bytes: Mapped[int]  = mapped_column(Integer, default=0)
-    mime_type:  Mapped[str]  = mapped_column(String(100), default="")
-    icon:       Mapped[str]  = mapped_column(String(10), default="📄")
-    icon_bg:    Mapped[str]  = mapped_column(String(20), default="#fee2e2")
+    id:         Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    course_id:  Mapped[int]      = mapped_column(Integer, ForeignKey("courses.id"))
+    name:       Mapped[str]      = mapped_column(String(300))
+    file_path:  Mapped[str]      = mapped_column(String(500))
+    size_bytes: Mapped[int]      = mapped_column(Integer, default=0)
+    mime_type:  Mapped[str]      = mapped_column(String(100), default="")
+    icon:       Mapped[str]      = mapped_column(String(10), default="📄")
+    icon_bg:    Mapped[str]      = mapped_column(String(20), default="#fee2e2")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     course: Mapped["Course"] = relationship("Course", back_populates="materials")
@@ -52,15 +98,135 @@ class Material(Base):
 class Assignment(Base):
     __tablename__ = "assignments"
 
-    id:          Mapped[int]  = mapped_column(Integer, primary_key=True, index=True)
-    course_id:   Mapped[int]  = mapped_column(Integer, ForeignKey("courses.id"))
-    title:       Mapped[str]  = mapped_column(String(300))
-    description: Mapped[str]  = mapped_column(Text, default="")
-    deadline:    Mapped[str]  = mapped_column(String(50), default="")   # "dd mon yyyy" display string
+    id:          Mapped[int]             = mapped_column(Integer, primary_key=True, index=True)
+    course_id:   Mapped[int]             = mapped_column(Integer, ForeignKey("courses.id"))
+    title:       Mapped[str]             = mapped_column(String(300))
+    description: Mapped[str]             = mapped_column(Text, default="")
+    deadline:    Mapped[str]             = mapped_column(String(50), default="")
     deadline_dt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    status:      Mapped[str]  = mapped_column(String(50), default="pending")  # pending|progress|done|overdue
-    file_path:   Mapped[str | None] = mapped_column(String(500), nullable=True)
-    file_name:   Mapped[str | None] = mapped_column(String(300), nullable=True)
-    created_at:  Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    status:      Mapped[str]             = mapped_column(String(50), default="pending")
+    file_path:   Mapped[str | None]      = mapped_column(String(500), nullable=True)
+    file_name:   Mapped[str | None]      = mapped_column(String(300), nullable=True)
+    ai_advice:   Mapped[str | None]      = mapped_column(Text, nullable=True, default=None)
+    created_at:  Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow)
 
     course: Mapped["Course"] = relationship("Course", back_populates="assignments")
+
+
+class ScheduleEvent(Base):
+    __tablename__ = "schedule_events"
+
+    id:               Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    user_id:          Mapped[int]      = mapped_column(Integer, ForeignKey("users.id"))
+    title:            Mapped[str]      = mapped_column(String(200))
+    day_index:        Mapped[int]      = mapped_column(Integer, default=0)
+    start_minute:     Mapped[int]      = mapped_column(Integer, default=540)
+    duration_minutes: Mapped[int]      = mapped_column(Integer, default=90)
+    location:         Mapped[str]      = mapped_column(String(200), default="")
+    teacher:          Mapped[str]      = mapped_column(String(200), default="")
+    type:             Mapped[str]      = mapped_column(String(40), default="lecture")
+    color:            Mapped[str]      = mapped_column(String(20), default="#3d52d5")
+    created_at:       Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship("User", back_populates="schedule_events")
+
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id:          Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    owner_id:    Mapped[int]      = mapped_column(Integer, ForeignKey("users.id"))
+    name:        Mapped[str]      = mapped_column(String(200))
+    description: Mapped[str]      = mapped_column(Text, default="")
+    color:       Mapped[str]      = mapped_column(String(20), default="#3d52d5")
+    created_at:  Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    owner: Mapped["User"] = relationship("User", back_populates="owned_projects", foreign_keys=[owner_id])
+    members: Mapped[list["ProjectMember"]] = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
+    tasks: Mapped[list["ProjectTask"]] = relationship("ProjectTask", back_populates="project", cascade="all, delete-orphan")
+    files: Mapped[list["ProjectFile"]] = relationship("ProjectFile", back_populates="project", cascade="all, delete-orphan")
+    messages: Mapped[list["ProjectMessage"]] = relationship("ProjectMessage", back_populates="project", cascade="all, delete-orphan")
+
+
+class ProjectMember(Base):
+    __tablename__ = "project_members"
+    __table_args__ = (UniqueConstraint("project_id", "user_id", name="uq_project_member"),)
+
+    id:         Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    project_id: Mapped[int]      = mapped_column(Integer, ForeignKey("projects.id"))
+    user_id:    Mapped[int]      = mapped_column(Integer, ForeignKey("users.id"))
+    role:       Mapped[str]      = mapped_column(String(40), default="member")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship("Project", back_populates="members")
+    user: Mapped["User"] = relationship("User", back_populates="project_memberships")
+
+
+class ProjectTask(Base):
+    __tablename__ = "project_tasks"
+
+    id:            Mapped[int]             = mapped_column(Integer, primary_key=True, index=True)
+    project_id:    Mapped[int]             = mapped_column(Integer, ForeignKey("projects.id"))
+    title:         Mapped[str]             = mapped_column(String(300))
+    description:   Mapped[str]             = mapped_column(Text, default="")
+    status:        Mapped[str]             = mapped_column(String(50), default="todo")
+    due_date:      Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    assignee_id:   Mapped[int | None]      = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by_id: Mapped[int]             = mapped_column(Integer, ForeignKey("users.id"))
+    created_at:    Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at:    Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at:  Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    project: Mapped["Project"] = relationship("Project", back_populates="tasks")
+    assignee: Mapped["User"] = relationship("User", back_populates="assigned_project_tasks", foreign_keys=[assignee_id])
+    creator: Mapped["User"] = relationship("User", back_populates="created_project_tasks", foreign_keys=[created_by_id])
+    comments: Mapped[list["ProjectTaskComment"]] = relationship(
+        "ProjectTaskComment",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        order_by="ProjectTaskComment.created_at.asc()",
+    )
+
+
+class ProjectTaskComment(Base):
+    __tablename__ = "project_task_comments"
+
+    id:         Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    task_id:    Mapped[int]      = mapped_column(Integer, ForeignKey("project_tasks.id"))
+    author_id:  Mapped[int]      = mapped_column(Integer, ForeignKey("users.id"))
+    body:       Mapped[str]      = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    task: Mapped["ProjectTask"] = relationship("ProjectTask", back_populates="comments")
+    author: Mapped["User"] = relationship("User", back_populates="project_task_comments", foreign_keys=[author_id])
+
+
+class ProjectFile(Base):
+    __tablename__ = "project_files"
+
+    id:          Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    project_id:  Mapped[int]      = mapped_column(Integer, ForeignKey("projects.id"))
+    uploader_id: Mapped[int]      = mapped_column(Integer, ForeignKey("users.id"))
+    name:        Mapped[str]      = mapped_column(String(300))
+    file_path:   Mapped[str]      = mapped_column(String(500))
+    size_bytes:  Mapped[int]      = mapped_column(Integer, default=0)
+    mime_type:   Mapped[str]      = mapped_column(String(100), default="")
+    icon:        Mapped[str]      = mapped_column(String(10), default="📄")
+    icon_bg:     Mapped[str]      = mapped_column(String(20), default="#fee2e2")
+    created_at:  Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship("Project", back_populates="files")
+    uploader: Mapped["User"] = relationship("User", back_populates="uploaded_project_files", foreign_keys=[uploader_id])
+
+
+class ProjectMessage(Base):
+    __tablename__ = "project_messages"
+
+    id:         Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    project_id: Mapped[int]      = mapped_column(Integer, ForeignKey("projects.id"))
+    author_id:  Mapped[int]      = mapped_column(Integer, ForeignKey("users.id"))
+    body:       Mapped[str]      = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship("Project", back_populates="messages")
+    author: Mapped["User"] = relationship("User", back_populates="project_messages", foreign_keys=[author_id])

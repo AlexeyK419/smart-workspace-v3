@@ -3,16 +3,16 @@
     <!-- Header + Add button -->
     <div class="tab-header">
       <div class="tab-count">{{ course.assignments?.length ?? 0 }} заданий</div>
-      <button class="btn btn-primary" @click="showForm = true">
+      <button class="btn btn-primary" @click="openAddForm">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
         Добавить задание
       </button>
     </div>
 
-    <!-- Add Assignment Form (inline) -->
+    <!-- Add / Edit Assignment Form (inline) -->
     <Transition name="form-slide">
       <div v-if="showForm" class="add-form card">
-        <div class="add-form-title">Новое задание</div>
+        <div class="add-form-title">{{ editingId ? 'Редактировать задание' : 'Новое задание' }}</div>
         <div class="form-row">
           <div class="form-group" style="flex:2">
             <label class="form-label">Название *</label>
@@ -48,7 +48,7 @@
         <div class="form-actions">
           <button class="btn btn-ghost" @click="cancelForm">Отмена</button>
           <button class="btn btn-primary" :disabled="!form.title || saving" @click="submitForm">
-            {{ saving ? 'Сохранение...' : 'Сохранить' }}
+            {{ saving ? 'Сохранение...' : (editingId ? 'Сохранить' : 'Создать') }}
           </button>
         </div>
       </div>
@@ -78,18 +78,26 @@
 
         <div class="ac-desc">{{ a.description }}</div>
 
+        <!-- Saved AI advice preview -->
+        <div v-if="a.ai_advice" class="ac-ai-saved">
+          💡 AI-подсказка сохранена
+        </div>
+
         <div class="ac-footer">
           <div class="ac-deadline" v-if="a.deadline">
             <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
             {{ a.deadline }}
           </div>
           <div style="display:flex;gap:6px;margin-left:auto">
-            <a v-if="a.file_name" :href="api.downloadAssignmentUrl(course.id, a.id)" target="_blank" class="ac-btn" title="Скачать файл">
+            <button v-if="a.file_name" class="ac-btn" title="Скачать файл" @click="downloadAssignment(a)">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
               {{ a.file_name }}
-            </a>
+            </button>
+            <button class="ac-btn" title="Редактировать" @click="openEditForm(a)">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </button>
             <button class="ac-btn ac-btn-ai" @click="emit('ai-help', a)">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
               AI
             </button>
             <button class="ac-btn ac-btn-del" title="Удалить" @click="remove(a.id)">
@@ -111,13 +119,32 @@ const props = defineProps({ course: { type: Object, required: true } })
 const emit  = defineEmits(['ai-help'])
 const store = useWorkspaceStore()
 
-const showForm = ref(false)
-const saving   = ref(false)
-
+const showForm  = ref(false)
+const saving    = ref(false)
+const editingId = ref(null)
 const form = reactive({ title: '', description: '', deadline_raw: '', status: 'pending', file: null })
+
+function openAddForm() {
+  editingId.value = null
+  Object.assign(form, { title: '', description: '', deadline_raw: '', status: 'pending', file: null })
+  showForm.value = true
+}
+
+function openEditForm(a) {
+  editingId.value = a.id
+  Object.assign(form, {
+    title: a.title,
+    description: a.description,
+    deadline_raw: '',
+    status: a.status,
+    file: null,
+  })
+  showForm.value = true
+}
 
 function cancelForm() {
   showForm.value = false
+  editingId.value = null
   Object.assign(form, { title: '', description: '', deadline_raw: '', status: 'pending', file: null })
 }
 
@@ -134,16 +161,29 @@ async function submitForm() {
   const fd = new FormData()
   fd.append('title',       form.title)
   fd.append('description', form.description)
-  fd.append('deadline',    formatDeadline(form.deadline_raw))
+  fd.append('deadline',    formatDeadline(form.deadline_raw) || (editingId.value ? '' : ''))
   fd.append('status',      form.status)
   if (form.file) fd.append('file', form.file)
-  await store.createAssignment(props.course.id, fd)
+
+  if (editingId.value) {
+    await store.updateAssignmentFull(props.course.id, editingId.value, fd)
+  } else {
+    await store.createAssignment(props.course.id, fd)
+  }
   saving.value = false
   cancelForm()
 }
 
 async function changeStatus(a, e) {
   await store.updateAssignmentStatus(props.course.id, a.id, e.target.value)
+}
+
+async function downloadAssignment(assignment) {
+  try {
+    await api.downloadAssignment(props.course.id, assignment.id, assignment.file_name || assignment.title)
+  } catch (e) {
+    store.showToast('Ошибка скачивания: ' + e.message)
+  }
 }
 
 async function remove(id) {
@@ -155,13 +195,10 @@ async function remove(id) {
 <style scoped>
 .tab-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .tab-count  { font-size: 14px; font-weight: 600; }
-
-/* Add form */
 .add-form { margin-bottom: 16px; padding: 18px; border: 1.5px solid var(--accent-mid); }
 .add-form-title { font-weight: 600; font-size: 14px; margin-bottom: 14px; color: var(--accent); }
 .form-row { display: flex; gap: 12px; }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
-
 .file-pick-label {
   display: flex; align-items: center; gap: 7px;
   padding: 8px 12px; border: 1px solid var(--border);
@@ -172,37 +209,36 @@ async function remove(id) {
 }
 .file-pick-label:hover { border-color: var(--accent); color: var(--accent); }
 .file-input { display: none; }
-
 .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
 .empty-icon  { font-size: 36px; margin-bottom: 10px; }
 .empty-state p { font-size: 13.5px; }
-
 .assignments-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 14px;
 }
-
 .assignment-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 16px;
   transition: box-shadow var(--transition);
 }
 .assignment-card:hover { box-shadow: var(--shadow); }
-
 .ac-top {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 8px; margin-bottom: 8px;
 }
 .ac-title { font-size: 13.5px; font-weight: 600; line-height: 1.4; }
 .ac-desc  { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.55; }
+.ac-ai-saved {
+  font-size: 11px; color: #1a7a32; background: #e8f5e9;
+  border-radius: 6px; padding: 4px 8px; margin-bottom: 8px;
+  display: inline-block;
+}
 .ac-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .ac-deadline { font-size: 11.5px; color: var(--text-muted); display: flex; align-items: center; gap: 3px; }
-
 .status-select {
   font-size: 11px; border: 1px solid var(--border); border-radius: 4px;
   padding: 2px 4px; background: var(--bg); font-family: var(--font-body);
   color: var(--text-secondary); cursor: pointer; outline: none;
 }
-
 .ac-btn {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 5px 9px; border-radius: var(--radius-sm);
@@ -212,11 +248,10 @@ async function remove(id) {
   color: var(--text-muted); text-decoration: none;
 }
 .ac-btn:hover { background: var(--surface-2); color: var(--text-primary); }
-.ac-btn svg   { width: 12px; height: 12px; }
-.ac-btn-ai    { border-color: var(--accent-mid); color: var(--accent); background: var(--accent-light); }
+.ac-btn svg { width: 12px; height: 12px; }
+.ac-btn-ai { border-color: var(--accent-mid); color: var(--accent); background: var(--accent-light); }
 .ac-btn-ai:hover { background: var(--accent); color: white; }
 .ac-btn-del:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
-
 .form-slide-enter-active, .form-slide-leave-active { transition: all 0.25s ease; }
 .form-slide-enter-from, .form-slide-leave-to { opacity: 0; transform: translateY(-10px); }
 </style>

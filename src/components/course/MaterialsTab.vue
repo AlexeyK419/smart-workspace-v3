@@ -24,9 +24,9 @@
         <div class="file-meta">{{ store.humanSize(file.size_bytes) }} · {{ formatDate(file.created_at) }}</div>
       </div>
       <div class="file-actions">
-        <a :href="api.downloadMaterialUrl(course.id, file.id)" target="_blank" class="action-btn" title="Скачать">
+        <button class="action-btn" title="Скачать" @click="download(file)">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-        </a>
+        </button>
         <button class="action-btn action-btn-danger" title="Удалить" @click="remove(file.id)">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
         </button>
@@ -51,6 +51,14 @@ async function onFileChange(e) {
   await store.uploadMaterial(props.course.id, file)
   uploading.value = false
   e.target.value = ''
+}
+
+async function download(file) {
+  try {
+    await api.downloadMaterial(props.course.id, file.id, file.name)
+  } catch (e) {
+    store.showToast('Ошибка скачивания: ' + e.message)
+  }
 }
 
 async function remove(matId) {
