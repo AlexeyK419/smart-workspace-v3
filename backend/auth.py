@@ -44,6 +44,15 @@ def compute_initials(name: str) -> str:
     return (parts[0][0] + parts[1][0]).upper()
 
 
+
+
+def get_user_by_token(token: str, db: Session) -> models.User | None:
+    normalized = (token or "").strip()
+    if not normalized:
+        return None
+    return db.query(models.User).filter(models.User.auth_token == normalized).first()
+
+
 def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
     db: Session = Depends(get_db),
@@ -52,7 +61,7 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Требуется вход в аккаунт")
 
     token = credentials.credentials.strip()
-    user = db.query(models.User).filter(models.User.auth_token == token).first()
+    user = get_user_by_token(token, db)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Сессия недействительна")
     return user

@@ -15,6 +15,10 @@ export function getAuthToken() {
   return authToken
 }
 
+function toWebSocketBase(url) {
+  return url.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:')
+}
+
 function getFilenameFromDisposition(header) {
   const match = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(header || '')
   const raw = match?.[1] || match?.[2] || ''
@@ -89,33 +93,38 @@ export const api = {
     fd.append('file', file)
     return request('POST', `/courses/${courseId}/materials/`, fd)
   },
-  deleteMaterial:      (courseId, matId) => request('DELETE', `/courses/${courseId}/materials/${matId}`),
+  deleteMaterial:       (courseId, matId) => request('DELETE', `/courses/${courseId}/materials/${matId}`),
   downloadMaterial:     (courseId, matId, fileName = 'material') => downloadWithAuth(`/courses/${courseId}/materials/${matId}/download`, fileName),
 
-  getAssignments:       (courseId)         => request('GET',   `/courses/${courseId}/assignments/`),
-  createAssignment:     (courseId, fd)     => request('POST',  `/courses/${courseId}/assignments/`, fd),
+  getAssignments:       (courseId)           => request('GET',   `/courses/${courseId}/assignments/`),
+  createAssignment:     (courseId, fd)       => request('POST',  `/courses/${courseId}/assignments/`, fd),
   updateAssignment:     (courseId, id, data) => request('PATCH', `/courses/${courseId}/assignments/${id}`, data),
-  fullUpdateAssignment: (courseId, id, fd) => request('PUT', `/courses/${courseId}/assignments/${id}`, fd),
-  deleteAssignment:      (courseId, id)      => request('DELETE', `/courses/${courseId}/assignments/${id}`),
-  downloadAssignment:    (courseId, id, fileName = 'assignment') => downloadWithAuth(`/courses/${courseId}/assignments/${id}/download`, fileName),
+  fullUpdateAssignment: (courseId, id, fd)   => request('PUT',   `/courses/${courseId}/assignments/${id}`, fd),
+  deleteAssignment:     (courseId, id)       => request('DELETE', `/courses/${courseId}/assignments/${id}`),
+  downloadAssignment:   (courseId, id, fileName = 'assignment') => downloadWithAuth(`/courses/${courseId}/assignments/${id}/download`, fileName),
 
-  getSchedule:       ()         => request('GET',   '/schedule/'),
-  createSchedule:    (data)     => request('POST',  '/schedule/', data),
-  updateSchedule:    (id, data) => request('PATCH', `/schedule/${id}`, data),
-  deleteSchedule:    (id)       => request('DELETE', `/schedule/${id}`),
+  getSchedule:    ()         => request('GET',    '/schedule/'),
+  createSchedule: (data)     => request('POST',   '/schedule/', data),
+  updateSchedule: (id, data) => request('PATCH',  `/schedule/${id}`, data),
+  deleteSchedule: (id)       => request('DELETE', `/schedule/${id}`),
 
-  getProjects:       ()         => request('GET', '/projects/'),
-  getProject:        (id)       => request('GET', `/projects/${id}`),
-  createProject:     (data)     => request('POST', '/projects/', data),
-  updateProject:     (id, data) => request('PATCH', `/projects/${id}`, data),
-  deleteProject:     (id)       => request('DELETE', `/projects/${id}`),
+  getProjects:       ()              => request('GET', '/projects/'),
+  getProject:        (id)            => request('GET', `/projects/${id}`),
+  createProject:     (data)          => request('POST', '/projects/', data),
+  updateProject:     (id, data)      => request('PATCH', `/projects/${id}`, data),
+  deleteProject:     (id)            => request('DELETE', `/projects/${id}`),
   addProjectMember:  (projectId, data) => request('POST', `/projects/${projectId}/members`, data),
   removeProjectMember: (projectId, memberId) => request('DELETE', `/projects/${projectId}/members/${memberId}`),
   createProjectTask: (projectId, data) => request('POST', `/projects/${projectId}/tasks`, data),
   updateProjectTask: (projectId, taskId, data) => request('PATCH', `/projects/${projectId}/tasks/${taskId}`, data),
   deleteProjectTask: (projectId, taskId) => request('DELETE', `/projects/${projectId}/tasks/${taskId}`),
+  createProjectTaskComment: (projectId, taskId, data) => request('POST', `/projects/${projectId}/tasks/${taskId}/comments`, data),
   getProjectMessages: (projectId) => request('GET', `/projects/${projectId}/messages`),
   postProjectMessage: (projectId, data) => request('POST', `/projects/${projectId}/messages`, data),
+  projectChatSocketUrl: (projectId) => {
+    const token = encodeURIComponent(authToken || '')
+    return `${toWebSocketBase(BASE)}/ws/projects/${projectId}/chat?token=${token}`
+  },
   getProjectFiles:    (projectId) => request('GET', `/projects/${projectId}/files`),
   uploadProjectFile:  (projectId, file) => {
     const fd = new FormData()

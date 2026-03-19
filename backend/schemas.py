@@ -161,6 +161,10 @@ class ProjectMemberAddRequest(BaseModel):
     email: str | None = None
 
 
+class ProjectTaskCommentCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
+
+
 class ProjectTaskCreate(BaseModel):
     title: str
     description: str = ""
@@ -192,6 +196,17 @@ class ProjectMemberOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ProjectTaskCommentOut(BaseModel):
+    id: int
+    task_id: int
+    author_id: int
+    body: str
+    created_at: datetime
+    author: UserOut | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class ProjectTaskOut(BaseModel):
     id: int
     project_id: int
@@ -202,8 +217,11 @@ class ProjectTaskOut(BaseModel):
     assignee_id: int | None = None
     created_by_id: int
     created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None = None
     assignee: UserOut | None = None
     creator: UserOut | None = None
+    comments: list[ProjectTaskCommentOut] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 

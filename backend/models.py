@@ -43,6 +43,11 @@ class User(Base):
         back_populates="creator",
         foreign_keys="ProjectTask.created_by_id",
     )
+    project_task_comments: Mapped[list["ProjectTaskComment"]] = relationship(
+        "ProjectTaskComment",
+        back_populates="author",
+        foreign_keys="ProjectTaskComment.author_id",
+    )
     uploaded_project_files: Mapped[list["ProjectFile"]] = relationship(
         "ProjectFile",
         back_populates="uploader",
@@ -169,25 +174,46 @@ class ProjectTask(Base):
     assignee_id:   Mapped[int | None]      = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     created_by_id: Mapped[int]             = mapped_column(Integer, ForeignKey("users.id"))
     created_at:    Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at:    Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at:  Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     project: Mapped["Project"] = relationship("Project", back_populates="tasks")
     assignee: Mapped["User"] = relationship("User", back_populates="assigned_project_tasks", foreign_keys=[assignee_id])
     creator: Mapped["User"] = relationship("User", back_populates="created_project_tasks", foreign_keys=[created_by_id])
+    comments: Mapped[list["ProjectTaskComment"]] = relationship(
+        "ProjectTaskComment",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        order_by="ProjectTaskComment.created_at.asc()",
+    )
+
+
+class ProjectTaskComment(Base):
+    __tablename__ = "project_task_comments"
+
+    id:         Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    task_id:    Mapped[int]      = mapped_column(Integer, ForeignKey("project_tasks.id"))
+    author_id:  Mapped[int]      = mapped_column(Integer, ForeignKey("users.id"))
+    body:       Mapped[str]      = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    task: Mapped["ProjectTask"] = relationship("ProjectTask", back_populates="comments")
+    author: Mapped["User"] = relationship("User", back_populates="project_task_comments", foreign_keys=[author_id])
 
 
 class ProjectFile(Base):
     __tablename__ = "project_files"
 
-    id:         Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
-    project_id: Mapped[int]      = mapped_column(Integer, ForeignKey("projects.id"))
-    uploader_id: Mapped[int]     = mapped_column(Integer, ForeignKey("users.id"))
-    name:       Mapped[str]      = mapped_column(String(300))
-    file_path:  Mapped[str]      = mapped_column(String(500))
-    size_bytes: Mapped[int]      = mapped_column(Integer, default=0)
-    mime_type:  Mapped[str]      = mapped_column(String(100), default="")
-    icon:       Mapped[str]      = mapped_column(String(10), default="📄")
-    icon_bg:    Mapped[str]      = mapped_column(String(20), default="#fee2e2")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    id:          Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    project_id:  Mapped[int]      = mapped_column(Integer, ForeignKey("projects.id"))
+    uploader_id: Mapped[int]      = mapped_column(Integer, ForeignKey("users.id"))
+    name:        Mapped[str]      = mapped_column(String(300))
+    file_path:   Mapped[str]      = mapped_column(String(500))
+    size_bytes:  Mapped[int]      = mapped_column(Integer, default=0)
+    mime_type:   Mapped[str]      = mapped_column(String(100), default="")
+    icon:        Mapped[str]      = mapped_column(String(10), default="📄")
+    icon_bg:     Mapped[str]      = mapped_column(String(20), default="#fee2e2")
+    created_at:  Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     project: Mapped["Project"] = relationship("Project", back_populates="files")
     uploader: Mapped["User"] = relationship("User", back_populates="uploaded_project_files", foreign_keys=[uploader_id])

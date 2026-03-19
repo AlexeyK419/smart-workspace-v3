@@ -3,8 +3,9 @@ Smart Student Workspace — FastAPI backend v5
   • PostgreSQL via SQLAlchemy 2
   • token-based auth (register/login/me)
   • per-user data isolation
-  • team projects with tasks, files and chat
+  • team projects with tasks, files, comments and realtime chat
   • AI assistant integration
+  • WebSocket project chat
   • file uploads (materials + assignments + project files)
 """
 
@@ -39,7 +40,11 @@ def upgrade_schema():
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_token VARCHAR(255)"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users (email)"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_auth_token ON users (auth_token)"))
-    logger.info("Database auth columns ensured")
+        conn.execute(text("ALTER TABLE project_tasks ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP"))
+        conn.execute(text("ALTER TABLE project_tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP"))
+        conn.execute(text("UPDATE project_tasks SET updated_at = COALESCE(updated_at, created_at, NOW())"))
+        conn.execute(text("UPDATE project_tasks SET completed_at = COALESCE(completed_at, created_at, NOW()) WHERE status = 'done'"))
+    logger.info("Database auth and project task columns ensured")
 
 
 def upgrade_legacy_users_auth():
@@ -295,7 +300,7 @@ app = FastAPI(
         "REST API for the student workspace diploma project.\n\n"
         "**Database:** PostgreSQL\n"
         "**Authentication:** bearer token\n"
-        "**Collaboration:** team projects, tasks, files and chat\n"
+        "**Collaboration:** team projects, tasks, comments, shared files and realtime chat\n"
         "**Assistant:** Workspace AI\n"
     ),
     lifespan=lifespan,
@@ -316,4 +321,5 @@ app.include_router(materials.router)
 app.include_router(assignments.router)
 app.include_router(schedule.router)
 app.include_router(projects.router)
+app.include_router(projects.ws_router)
 app.include_router(ai.router)

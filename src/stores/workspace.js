@@ -18,10 +18,22 @@ function normalizeScheduleEvent(event) {
   }
 }
 
+function normalizeProjectTaskComment(comment) {
+  return {
+    ...comment,
+    createdAt: comment?.created_at ? new Date(comment.created_at) : null,
+  }
+}
+
 function normalizeProjectTask(task) {
   return {
     ...task,
     dueDate: task?.due_date ? new Date(task.due_date) : null,
+    updatedAt: task?.updated_at ? new Date(task.updated_at) : null,
+    completedAt: task?.completed_at ? new Date(task.completed_at) : null,
+    comments: [...(task.comments || [])]
+      .map(normalizeProjectTaskComment)
+      .sort((a, b) => (a.createdAt?.getTime?.() || 0) - (b.createdAt?.getTime?.() || 0)),
   }
 }
 
@@ -436,6 +448,23 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
+  async function addProjectTaskComment(projectId, taskId, body) {
+    try {
+      const created = normalizeProjectTaskComment(await api.createProjectTaskComment(projectId, taskId, { body }))
+      const project = projects.value.find((item) => item.id === projectId)
+      const task = project?.tasks?.find((item) => item.id === taskId)
+      if (task) {
+        task.comments = [...(task.comments || []), created].sort((a, b) => (a.createdAt?.getTime?.() || 0) - (b.createdAt?.getTime?.() || 0))
+        task.updatedAt = new Date()
+      }
+      showToast('Комментарий добавлен')
+      return created
+    } catch (e) {
+      showToast('Ошибка комментария: ' + e.message)
+      throw e
+    }
+  }
+
   async function deleteProjectTask(projectId, taskId) {
     try {
       await api.deleteProjectTask(projectId, taskId)
@@ -559,6 +588,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     removeProjectMember,
     createProjectTask,
     updateProjectTask,
+    addProjectTaskComment,
     deleteProjectTask,
     uploadProjectFile,
     deleteProjectFile,

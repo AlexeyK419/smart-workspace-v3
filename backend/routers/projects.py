@@ -1,17 +1,21 @@
 import os
 import uuid
+from collections import defaultdict
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
-from auth import ensure_project_owner, get_current_user, get_project_for_user_or_404
-from database import get_db
+from auth import ensure_project_owner, get_current_user, get_project_for_user_or_404, get_user_by_token
+from database import SessionLocal, get_db
 import models
 import schemas
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+ws_router = APIRouter(prefix="/ws/projects", tags=["projects-ws"])
 
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads", "project_files")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -35,14 +39,62 @@ MIME_ICONS: dict[str, tuple[str, str]] = {
 }
 
 
+class ProjectChatConnectionManager:
+    def __init__(self):
+        self.active: dict[int, set[WebSocket]] = defaultdict(set)
+
+    async def connect(self, project_id: int, websocket: WebSocket):
+        await websocket.accept()
+        self.active[project_id].add(websocket)
+
+    def disconnect(self, project_id: int, websocket: WebSocket):
+        clients = self.active.get(project_id)
+        if not clients:
+            return
+        clients.discard(websocket)
+        if not clients:
+            self.active.pop(project_id, None)
+
+    async def broadcast(self, project_id: int, payload: dict, exclude: WebSocket | None = None):
+        dead: list[WebSocket] = []
+        for websocket in list(self.active.get(project_id, set())):
+            if exclude is not None and websocket is exclude:
+                continue
+            try:
+                await websocket.send_json(payload)
+            except Exception:
+                dead.append(websocket)
+        for websocket in dead:
+            self.disconnect(project_id, websocket)
+
+    def connection_count(self, project_id: int) -> int:
+        return len(self.active.get(project_id, set()))
+
+
+chat_manager = ProjectChatConnectionManager()
+
+
 def _project_detail_query(db: Session):
     return db.query(models.Project).options(
         selectinload(models.Project.owner),
         selectinload(models.Project.members).selectinload(models.ProjectMember.user),
         selectinload(models.Project.tasks).selectinload(models.ProjectTask.assignee),
         selectinload(models.Project.tasks).selectinload(models.ProjectTask.creator),
+        selectinload(models.Project.tasks).selectinload(models.ProjectTask.comments).selectinload(models.ProjectTaskComment.author),
         selectinload(models.Project.files).selectinload(models.ProjectFile.uploader),
     )
+
+
+def _task_query(db: Session):
+    return db.query(models.ProjectTask).options(
+        selectinload(models.ProjectTask.assignee),
+        selectinload(models.ProjectTask.creator),
+        selectinload(models.ProjectTask.comments).selectinload(models.ProjectTaskComment.author),
+    )
+
+
+def _message_query(db: Session):
+    return db.query(models.ProjectMessage).options(selectinload(models.ProjectMessage.author))
 
 
 def _project_for_member_or_404(project_id: int, user_id: int, db: Session) -> models.Project:
@@ -72,6 +124,41 @@ def _validate_assignee(project_id: int, assignee_id: int | None, db: Session):
     if assignee_id is None:
         return
     _ensure_member_belongs_to_project(project_id, assignee_id, db)
+
+
+def _get_task_or_404(project_id: int, task_id: int, db: Session) -> models.ProjectTask:
+    task = _task_query(db).filter(
+        models.ProjectTask.id == task_id,
+        models.ProjectTask.project_id == project_id,
+    ).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+    return task
+
+
+def _get_message_or_404(project_id: int, message_id: int, db: Session) -> models.ProjectMessage:
+    message = _message_query(db).filter(
+        models.ProjectMessage.id == message_id,
+        models.ProjectMessage.project_id == project_id,
+    ).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Сообщение не найдено")
+    return message
+
+
+def _apply_task_status(task: models.ProjectTask, status: str | None):
+    if status is None:
+        return
+    task.status = status
+    if status == "done":
+        task.completed_at = task.completed_at or datetime.utcnow()
+    else:
+        task.completed_at = None
+    task.updated_at = datetime.utcnow()
+
+
+def _serialize_message(message: models.ProjectMessage) -> dict:
+    return jsonable_encoder(schemas.ProjectMessageOut.model_validate(message, from_attributes=True))
 
 
 @router.get("/", response_model=list[schemas.ProjectOut])
@@ -201,7 +288,7 @@ def remove_member(
     db.query(models.ProjectTask).filter(
         models.ProjectTask.project_id == project_id,
         models.ProjectTask.assignee_id == membership.user_id,
-    ).update({models.ProjectTask.assignee_id: None})
+    ).update({models.ProjectTask.assignee_id: None, models.ProjectTask.updated_at: datetime.utcnow()})
     db.delete(membership)
     db.commit()
     return _project_for_member_or_404(project_id, current_user.id, db)
@@ -215,8 +302,7 @@ def list_messages(
 ):
     _project_for_member_or_404(project_id, current_user.id, db)
     return (
-        db.query(models.ProjectMessage)
-        .options(selectinload(models.ProjectMessage.author))
+        _message_query(db)
         .filter(models.ProjectMessage.project_id == project_id)
         .order_by(models.ProjectMessage.created_at.asc())
         .all()
@@ -224,7 +310,7 @@ def list_messages(
 
 
 @router.post("/{project_id}/messages", response_model=schemas.ProjectMessageOut, status_code=201)
-def create_message(
+async def create_message(
     project_id: int,
     payload: schemas.ProjectMessageCreate,
     current_user: models.User = Depends(get_current_user),
@@ -241,12 +327,9 @@ def create_message(
     )
     db.add(message)
     db.commit()
-    return (
-        db.query(models.ProjectMessage)
-        .options(selectinload(models.ProjectMessage.author))
-        .filter(models.ProjectMessage.id == message.id)
-        .first()
-    )
+    saved = _get_message_or_404(project_id, message.id, db)
+    await chat_manager.broadcast(project_id, {"type": "message.created", "message": _serialize_message(saved)})
+    return saved
 
 
 @router.post("/{project_id}/tasks", response_model=schemas.ProjectTaskOut, status_code=201)
@@ -261,16 +344,15 @@ def create_task(
     task = models.ProjectTask(
         project_id=project_id,
         created_by_id=current_user.id,
-        **payload.model_dump(),
+        title=payload.title,
+        description=payload.description,
+        due_date=payload.due_date,
+        assignee_id=payload.assignee_id,
     )
+    _apply_task_status(task, payload.status or "todo")
     db.add(task)
     db.commit()
-    return (
-        db.query(models.ProjectTask)
-        .options(selectinload(models.ProjectTask.assignee), selectinload(models.ProjectTask.creator))
-        .filter(models.ProjectTask.id == task.id)
-        .first()
-    )
+    return _get_task_or_404(project_id, task.id, db)
 
 
 @router.patch("/{project_id}/tasks/{task_id}", response_model=schemas.ProjectTaskOut)
@@ -282,25 +364,47 @@ def update_task(
     db: Session = Depends(get_db),
 ):
     _project_for_member_or_404(project_id, current_user.id, db)
-    task = (
-        db.query(models.ProjectTask)
-        .filter(models.ProjectTask.id == task_id, models.ProjectTask.project_id == project_id)
-        .first()
-    )
-    if not task:
-        raise HTTPException(status_code=404, detail="Задача не найдена")
+    task = _get_task_or_404(project_id, task_id, db)
 
     updates = payload.model_dump(exclude_unset=True)
     if "assignee_id" in updates:
         _validate_assignee(project_id, updates["assignee_id"], db)
 
     for field, value in updates.items():
+        if field == "status":
+            continue
         setattr(task, field, value)
+
+    if "status" in updates:
+        _apply_task_status(task, updates["status"])
+    else:
+        task.updated_at = datetime.utcnow()
+    db.commit()
+    return _get_task_or_404(project_id, task.id, db)
+
+
+@router.post("/{project_id}/tasks/{task_id}/comments", response_model=schemas.ProjectTaskCommentOut, status_code=201)
+def create_task_comment(
+    project_id: int,
+    task_id: int,
+    payload: schemas.ProjectTaskCommentCreate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _project_for_member_or_404(project_id, current_user.id, db)
+    task = _get_task_or_404(project_id, task_id, db)
+    body = payload.body.strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="Комментарий не должен быть пустым")
+
+    comment = models.ProjectTaskComment(task_id=task.id, author_id=current_user.id, body=body)
+    task.updated_at = datetime.utcnow()
+    db.add(comment)
     db.commit()
     return (
-        db.query(models.ProjectTask)
-        .options(selectinload(models.ProjectTask.assignee), selectinload(models.ProjectTask.creator))
-        .filter(models.ProjectTask.id == task.id)
+        db.query(models.ProjectTaskComment)
+        .options(selectinload(models.ProjectTaskComment.author))
+        .filter(models.ProjectTaskComment.id == comment.id)
         .first()
     )
 
@@ -313,13 +417,7 @@ def delete_task(
     db: Session = Depends(get_db),
 ):
     _project_for_member_or_404(project_id, current_user.id, db)
-    task = (
-        db.query(models.ProjectTask)
-        .filter(models.ProjectTask.id == task_id, models.ProjectTask.project_id == project_id)
-        .first()
-    )
-    if not task:
-        raise HTTPException(status_code=404, detail="Задача не найдена")
+    task = _get_task_or_404(project_id, task_id, db)
     db.delete(task)
     db.commit()
 
@@ -425,3 +523,79 @@ def delete_file(
         os.remove(item.file_path)
     db.delete(item)
     db.commit()
+
+
+@ws_router.websocket("/{project_id}/chat")
+async def project_chat_socket(websocket: WebSocket, project_id: int):
+    token = websocket.query_params.get("token", "")
+    db = SessionLocal()
+    user = None
+
+    try:
+        user = get_user_by_token(token, db)
+        if not user:
+            await websocket.close(code=4401, reason="auth_required")
+            return
+
+        membership = (
+            db.query(models.ProjectMember)
+            .filter(models.ProjectMember.project_id == project_id, models.ProjectMember.user_id == user.id)
+            .first()
+        )
+        if not membership:
+            await websocket.close(code=4403, reason="forbidden")
+            return
+
+        await chat_manager.connect(project_id, websocket)
+        await chat_manager.broadcast(project_id, {
+            "type": "presence.update",
+            "project_id": project_id,
+            "connections": chat_manager.connection_count(project_id),
+        })
+        await websocket.send_json({
+            "type": "connection.ready",
+            "project_id": project_id,
+            "user_id": user.id,
+            "connections": chat_manager.connection_count(project_id),
+        })
+
+        while True:
+            payload = await websocket.receive_json()
+            event_type = (payload.get("type") or "").strip()
+
+            if event_type == "typing":
+                await chat_manager.broadcast(project_id, {
+                    "type": "typing",
+                    "project_id": project_id,
+                    "user_id": user.id,
+                    "user_name": user.name,
+                    "is_typing": bool(payload.get("is_typing")),
+                }, exclude=websocket)
+                continue
+
+            if event_type != "message":
+                await websocket.send_json({"type": "error", "detail": "Unsupported event type"})
+                continue
+
+            body = str(payload.get("body") or "").strip()
+            if not body:
+                await websocket.send_json({"type": "error", "detail": "Сообщение не должно быть пустым"})
+                continue
+
+            message = models.ProjectMessage(project_id=project_id, author_id=user.id, body=body)
+            db.add(message)
+            db.commit()
+            saved = _get_message_or_404(project_id, message.id, db)
+            await chat_manager.broadcast(project_id, {"type": "message.created", "message": _serialize_message(saved)})
+
+    except WebSocketDisconnect:
+        pass
+    finally:
+        chat_manager.disconnect(project_id, websocket)
+        if user:
+            await chat_manager.broadcast(project_id, {
+                "type": "presence.update",
+                "project_id": project_id,
+                "connections": chat_manager.connection_count(project_id),
+            })
+        db.close()
