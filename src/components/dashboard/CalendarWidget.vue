@@ -41,7 +41,7 @@
                 v-for="assignment in cell.assignments.slice(0, 3)"
                 :key="assignment.id"
                 class="cell-dot"
-                :style="{ background: assignment.courseColor }"
+                :style="{ background: assignment.sourceColor }"
               ></span>
             </div>
             <span v-if="cell.assignments.length > 1" class="cell-count">{{ cell.assignments.length }}</span>
@@ -62,11 +62,11 @@
               @click="selectedAssignment = assignment"
             >
               <div class="assignment-topline">
-                <span class="assignment-course-pill" :style="{ background: assignment.courseColor + '20', color: assignment.courseColor }">
-                  {{ assignment.course }}
+                <span class="assignment-course-pill" :style="{ background: assignment.sourceColor + '20', color: assignment.sourceColor }">
+                  {{ assignment.sourceLabel }}
                 </span>
-                <span class="assignment-status chip" :class="'chip-' + assignment.status">
-                  {{ store.statusLabel(assignment.status) }}
+                <span class="assignment-status chip" :class="'chip-' + deadlineChipStatus(assignment)">
+                  {{ deadlineStatusLabel(assignment) }}
                 </span>
               </div>
               <div class="assignment-name">{{ assignment.title }}</div>
@@ -109,10 +109,10 @@
             <div class="detail-value detail-title">{{ selectedAssignment.title }}</div>
           </div>
           <div class="detail-row">
-            <div class="detail-label">Курс</div>
+            <div class="detail-label">Источник</div>
             <div class="detail-value">
-              <span class="assignment-course-pill" :style="{ background: selectedAssignment.courseColor + '20', color: selectedAssignment.courseColor }">
-                {{ selectedAssignment.course }}
+              <span class="assignment-course-pill" :style="{ background: selectedAssignment.sourceColor + '20', color: selectedAssignment.sourceColor }">
+                {{ selectedAssignment.sourceLabel }}
               </span>
             </div>
           </div>
@@ -136,7 +136,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useWorkspaceStore } from '@/stores/workspace'
-import { dateKey, parseRuDate, isSameDay, startOfDay } from '@/utils/dates'
+import { dateKey, isSameDay, startOfDay } from '@/utils/dates'
 
 const DAY_NAMES = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
 const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
@@ -150,7 +150,7 @@ const selectedAssignment = ref(null)
 
 const assignmentsByDate = computed(() => {
   const map = new Map()
-  store.allAssignments.forEach((assignment) => {
+  store.allDeadlines.forEach((assignment) => {
     if (!assignment.deadlineDate) return
     const key = dateKey(assignment.deadlineDate)
     const current = map.get(key) || []
@@ -175,7 +175,7 @@ const selectedDateLabel = computed(() =>
 )
 
 const upcomingAssignments = computed(() =>
-  store.allAssignments
+  store.allDeadlines
     .filter((assignment) => assignment.deadlineDate && assignment.deadlineDate >= today)
     .slice(0, 5)
 )
@@ -235,6 +235,16 @@ function jumpToAssignment(assignment) {
   month.value = assignment.deadlineDate.getMonth()
   year.value = assignment.deadlineDate.getFullYear()
   selectedAssignment.value = assignment
+}
+
+function deadlineChipStatus(item) {
+  if (item.kind !== 'project') return item.status
+  return { todo: 'pending', in_progress: 'progress', done: 'done' }[item.status] ?? 'pending'
+}
+
+function deadlineStatusLabel(item) {
+  if (item.kind === 'project') return store.projectTaskStatusLabel(item.status)
+  return store.statusLabel(item.status)
 }
 
 function prev() {

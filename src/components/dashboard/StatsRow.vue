@@ -24,7 +24,7 @@ const stats = computed(() => {
   const openAssignments = store.allAssignments.filter((a) => a.status !== 'done').length
   const totalProjects = store.projects.length
   const avgProgress = store.courses.length
-    ? Math.round(store.courses.reduce((acc, c) => acc + c.progress, 0) / store.courses.length)
+    ? Math.round(store.courses.reduce((acc, c) => acc + store.getCourseProgress(c), 0) / store.courses.length)
     : 0
 
   return [

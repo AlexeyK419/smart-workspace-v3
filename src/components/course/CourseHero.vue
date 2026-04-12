@@ -30,18 +30,25 @@
 
     <div class="course-progress">
       <div class="course-progress-label">Прогресс курса</div>
-      <div class="course-progress-value">{{ course.progress }}%</div>
+      <div class="course-progress-value">{{ progress }}%</div>
       <div class="progress-bar" style="width: 120px; margin-left: auto">
-        <div class="progress-fill" :style="{ width: course.progress + '%' }"></div>
+        <div class="progress-fill" :style="{ width: progress + '%' }"></div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { useWorkspaceStore } from '@/stores/workspace'
+
+const store = useWorkspaceStore()
+
+const props = defineProps({
   course: { type: Object, required: true },
 })
+
+const progress = computed(() => store.getCourseProgress(props.course))
 
 defineEmits(['edit', 'delete'])
 </script>

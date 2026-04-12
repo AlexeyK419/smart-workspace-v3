@@ -170,7 +170,11 @@ async function submitRegister() {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) 460px;
   gap: 28px;
+  width: 100%;
+  max-width: 1240px;
   padding: 28px;
+  margin: 0 auto;
+  align-items: center;
   background:
     radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 18%, transparent), transparent 34%),
     linear-gradient(
@@ -257,6 +261,9 @@ async function submitRegister() {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  justify-self: center;
+  width: 100%;
+  max-width: 460px;
 }
 .auth-tabs {
   display: grid;
@@ -273,9 +280,9 @@ async function submitRegister() {
   cursor: pointer;
 }
 .auth-tab.active {
-  background: var(--text-primary);
-  color: white;
-  border-color: var(--text-primary);
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+  color: var(--text-primary);
+  border-color: var(--border);
 }
 .auth-form {
   display: flex;
@@ -357,9 +364,15 @@ input:focus {
 @media (max-width: 1100px) {
   .welcome-shell {
     grid-template-columns: 1fr;
+    align-content: center;
   }
   .welcome-hero {
     padding: 28px;
   }
+}
+
+html[data-theme='dark'] .auth-tab.active {
+  background: color-mix(in srgb, var(--surface-2) 82%, #000 18%);
+  border-color: color-mix(in srgb, var(--border) 80%, #000 20%);
 }
 </style>

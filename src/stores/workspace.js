@@ -95,6 +95,72 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     })
   })
 
+  function formatDeadlineDate(value) {
+    const date = value instanceof Date ? value : new Date(value)
+    if (Number.isNaN(date?.getTime?.())) return ''
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+  }
+
+  function getCourseProgress(course) {
+    const assignments = course?.assignments || []
+    if (!assignments.length) return 0
+    const doneCount = assignments.filter((assignment) => assignment.status === 'done').length
+    return Math.round((doneCount / assignments.length) * 100)
+  }
+
+  const allDeadlines = computed(() => {
+    const items = []
+
+    courses.value.forEach((course) => {
+      ;(course.assignments || []).forEach((assignment) => {
+        const deadlineDate = assignment.deadline_dt
+          ? new Date(assignment.deadline_dt)
+          : parseRuDate(assignment.deadline)
+        if (!deadlineDate || Number.isNaN(deadlineDate.getTime())) return
+
+        items.push({
+          id: `course-${assignment.id}`,
+          kind: 'course',
+          title: assignment.title,
+          description: assignment.description,
+          deadline: assignment.deadline,
+          deadlineDate,
+          status: assignment.status,
+          sourceLabel: course.name,
+          sourceId: course.id,
+          sourceColor: course.color,
+          sourceRoute: `/course/${course.id}`,
+        })
+      })
+    })
+
+    projects.value.forEach((project) => {
+      ;(project.tasks || []).forEach((task) => {
+        if (!task.dueDate || Number.isNaN(task.dueDate.getTime()) || task.status === 'done') return
+
+        items.push({
+          id: `project-${task.id}`,
+          kind: 'project',
+          title: task.title,
+          description: task.description,
+          deadline: formatDeadlineDate(task.dueDate),
+          deadlineDate: task.dueDate,
+          status: task.status,
+          sourceLabel: project.name,
+          sourceId: project.id,
+          sourceColor: project.color,
+          sourceRoute: `/projects/${project.id}`,
+        })
+      })
+    })
+
+    return items.sort((a, b) => {
+      const aTime = a.deadlineDate?.getTime?.() ?? Number.POSITIVE_INFINITY
+      const bTime = b.deadlineDate?.getTime?.() ?? Number.POSITIVE_INFINITY
+      return aTime - bTime
+    })
+  })
+
   const todayEvents = computed(() => {
     const todayIndex = currentDayIndex()
     return scheduleEvents.value
@@ -560,9 +626,11 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     isLoading,
     toast,
     allAssignments,
+    allDeadlines,
     todayEvents,
     projectTasks,
     pendingProjectTasks,
+    getCourseProgress,
     fetchCourses,
     fetchSchedule,
     fetchProjects,
