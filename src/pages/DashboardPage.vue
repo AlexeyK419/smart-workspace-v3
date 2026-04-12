@@ -8,6 +8,7 @@
     <div class="dashboard-grid">
       <div class="dashboard-main">
         <CalendarWidget />
+        <AiWorkspaceSummaryCard />
       </div>
 
       <div class="dashboard-side">
@@ -23,6 +24,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import StatsRow from '@/components/dashboard/StatsRow.vue'
 import CalendarWidget from '@/components/dashboard/CalendarWidget.vue'
 import ScheduleToday from '@/components/dashboard/ScheduleToday.vue'
+import AiWorkspaceSummaryCard from '@/components/dashboard/AiWorkspaceSummaryCard.vue'
 
 const store = useWorkspaceStore()
 
@@ -56,6 +58,11 @@ const todayString = computed(() =>
   gap: 20px;
 }
 .dashboard-side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.dashboard-main {
   display: flex;
   flex-direction: column;
   gap: 18px;

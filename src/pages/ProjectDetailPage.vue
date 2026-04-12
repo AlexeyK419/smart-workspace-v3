@@ -230,6 +230,11 @@
       </div>
     </section>
 
+    <ProjectAiSummaryTab
+      v-else-if="activeTab === 'ai'"
+      :project-id="projectId"
+    />
+
     <section v-else class="members-grid">
       <div class="card">
         <div class="card-header">
@@ -461,6 +466,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { api } from '@/api/index.js'
+import ProjectAiSummaryTab from '@/components/project/ProjectAiSummaryTab.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -498,6 +504,7 @@ const tabs = [
   { key: 'tasks', label: 'Задачи' },
   { key: 'files', label: 'Файлы' },
   { key: 'chat', label: 'Чат' },
+  { key: 'ai', label: 'AI-сводка' },
   { key: 'members', label: 'Участники' },
 ]
 const taskLanes = [

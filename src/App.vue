@@ -54,7 +54,9 @@ watch(
     if (!isReady) return
 
     if (isAuthenticated) {
+      store.markWorkspaceHydrated(false)
       await Promise.all([store.fetchCourses(), store.fetchSchedule(), store.fetchProjects()])
+      store.markWorkspaceHydrated(true)
       if (route.meta.guestOnly) router.replace('/')
     } else {
       store.resetWorkspace()

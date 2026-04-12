@@ -149,5 +149,11 @@ export const api = {
   aiAssignmentHelp: (assignmentId, question = '') =>
     request('POST', `/ai/assignments/${assignmentId}/help`, { question }),
 
+  aiWorkspaceSummary: () =>
+    request('POST', '/ai/workspace/summary'),
+
+  aiProjectSummary: (projectId) =>
+    request('POST', `/ai/projects/${projectId}/summary`),
+
   aiModels: () => request('GET', '/ai/models'),
 }
