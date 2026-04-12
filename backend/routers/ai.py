@@ -22,7 +22,7 @@ from auth import (
     get_current_user,
 )
 from database import get_db
-from gigachat import Message, chat_complete, list_models
+from llm_provider import Message, chat_complete, list_models
 import models
 
 logger = logging.getLogger(__name__)

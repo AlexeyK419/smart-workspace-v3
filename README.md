@@ -1,20 +1,18 @@
-# 🎓 Smart Student Workspace v3
+# Smart Student Workspace v3
 
-**Стек:** Vue 3 + FastAPI + PostgreSQL + GigaChat (Sberbank LLM)
-
----
+Стек: Vue 3 + FastAPI + PostgreSQL + RouterAI (OpenAI-compatible API)
 
 ## Быстрый старт
 
 ```bash
-# 1. Настроить окружение
+# 1) Подготовить env
 cp backend/.env.example backend/.env
-#    → Заполнить DATABASE_URL, GIGACHAT_CLIENT_ID, GIGACHAT_CLIENT_SECRET
+#   -> заполнить DATABASE_URL и ROUTERAI_API_KEY
 
-# 2. Создать базу данных в PostgreSQL
+# 2) Создать БД в PostgreSQL
 createdb workspace_db
 
-# 3. Запустить оба сервера
+# 3) Запустить проект
 bash start.sh
 ```
 
@@ -31,88 +29,40 @@ uvicorn main:app --reload --port 8000
 npm install && npm run dev
 ```
 
----
-
-## Настройка .env
+## Переменные окружения
 
 ```dotenv
-# PostgreSQL
 DATABASE_URL=postgresql://postgres:password@localhost:5432/workspace_db
-
-# GigaChat — получить на developers.sber.ru
-GIGACHAT_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-GIGACHAT_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-GIGACHAT_SCOPE=GIGACHAT_API_PERS       # GIGACHAT_API_CORP для организаций
-GIGACHAT_MODEL=GigaChat                # или GigaChat-Plus / GigaChat-Pro
+ROUTERAI_API_KEY=your_routerai_api_key
+ROUTERAI_BASE_URL=https://routerai.ru/api/v1
+ROUTERAI_MODEL=google/gemma-4-31b-it
+ROUTERAI_TIMEOUT_SEC=60
 ```
 
----
+Как сменить модель:
+- поменяйте `ROUTERAI_MODEL` в `backend/.env`
+- перезапустите backend
 
-## Как получить ключи GigaChat
+## AI Endpoints
 
-1. Зарегистрируйтесь на **developers.sber.ru**
-2. Перейдите в раздел **GigaChat API**
-3. Создайте проект → получите `Client ID` и `Client Secret`
-4. Вставьте в `backend/.env`
+- `POST /ai/chat`
+- `POST /ai/courses/{id}/plan`
+- `POST /ai/assignments/{id}/help`
+- `GET /ai/models`
 
----
+Полная документация API: `http://localhost:8000/docs`
 
-## API Endpoints
+## Backend AI Architecture
 
-### AI (GigaChat)
-| Метод | URL | Описание |
-|-------|-----|----------|
-| POST | `/ai/chat` | Чат с GigaChat (история сообщений) |
-| POST | `/ai/courses/{id}/plan` | Генерация учебного плана курса |
-| POST | `/ai/assignments/{id}/help` | Помощь с заданием |
-| GET  | `/ai/models` | Список доступных моделей |
-
-### Курсы, Материалы, Задания
-| Метод | URL | Описание |
-|-------|-----|----------|
-| GET/POST | `/courses/` | Список / создание курсов |
-| POST | `/courses/{id}/materials/` | Загрузка файла-материала |
-| GET  | `/courses/{id}/materials/{mid}/download` | Скачать материал |
-| POST | `/courses/{id}/assignments/` | Создание задания + файл |
-| PATCH | `/courses/{id}/assignments/{aid}` | Обновить статус задания |
-| GET  | `/courses/{id}/assignments/{aid}/download` | Скачать файл задания |
-
-Полная документация: **http://localhost:8000/docs**
-
----
-
-## Архитектура бэкенда
-
-```
+```text
 backend/
-├── main.py          # FastAPI app, lifespan, seed данных
-├── config.py        # Pydantic Settings — читает .env
-├── database.py      # PostgreSQL через SQLAlchemy 2 + connection pool
-├── models.py        # ORM: User, Course, Material, Assignment
-├── schemas.py       # Pydantic запросы/ответы
-├── gigachat.py      # GigaChat сервис:
-│   ├── OAuth2 Client Credentials (кеш токена 30 мин)
-│   ├── chat_complete(messages) → str
-│   └── list_models() → list
-└── routers/
-    ├── ai.py          # /ai/chat, /ai/courses/{id}/plan, /ai/assignments/{id}/help
-    ├── users.py
-    ├── courses.py
-    ├── materials.py   # multipart upload → диск
-    └── assignments.py # Form Data + опциональный файл
+├── config.py          # Settings (env)
+├── llm_provider.py    # Универсальный LLM provider adapter (RouterAI)
+├── routers/
+│   └── ai.py          # AI endpoints, prompts, context assembly
+└── test.py            # RouterAI smoke test
 ```
 
-## Поток аутентификации GigaChat
-
-```
-Приложение                      Sberbank IdP
-    │                               │
-    │── POST /oauth ──────────────►│
-    │   Basic base64(id:secret)     │
-    │   grant_type=client_creds     │
-    │◄─ { access_token, expires_at }│
-    │                               │
-    │── POST /chat/completions ────►│  GigaChat API
-    │   Bearer <token>              │
-    │◄─ { choices[0].message } ────│
-```
+Примечание:
+- Frontend API-контракты и backend endpoints сохранены.
+- Миграция выполнена как замена provider layer без изменения пользовательского сценария.

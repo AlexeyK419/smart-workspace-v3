@@ -1,19 +1,14 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import os
 
 class Settings(BaseSettings):
     # PostgreSQL
     database_url: str = "postgresql://postgres:12345@localhost:5432/workspace_db"
-
-
-    gigachat_client_id: str = "0c181eec-4297-42c9-b737-46ddcaa54fc0"
-    gigachat_auth_key: str = "MGMxODFlZWMtNDI5Ny00MmM5LWI3MzctNDZkZGNhYTU0ZmMwOmQ1N2Y1NWNlLWEyN2YtNGEyZC1iZjY5LTU4ZTNjMjQ0MWNjMw=="
-    gigachat_scope: str = "GIGACHAT_API_PERS"
-    gigachat_model: str = "GigaChat"
-
-    # GigaChat endpoints
-    gigachat_auth_url: str = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
-    gigachat_api_url: str = "https://gigachat.devices.sberbank.ru/api/v1"
+    
+    # RouterAI (OpenAI-compatible)
+    routerai_api_key: str = ""
+    routerai_base_url: str = "https://routerai.ru/api/v1"
+    routerai_model: str = "google/gemma-4-31b-it"
+    routerai_timeout_sec: int = 60
 
     # CORS
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
