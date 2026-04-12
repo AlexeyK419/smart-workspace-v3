@@ -16,6 +16,7 @@
           }"
         >
           <div class="event-title">{{ event.title }}</div>
+          <div v-if="event.teacher" class="event-teacher">{{ event.teacher }}</div>
           <div class="event-location">{{ event.location || 'Место не указано' }}</div>
         </div>
       </div>
@@ -69,6 +70,11 @@ const store = useWorkspaceStore()
   font-weight: 600;
 }
 .event-location {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.event-teacher {
   font-size: 11.5px;
   color: var(--text-muted);
   margin-top: 2px;

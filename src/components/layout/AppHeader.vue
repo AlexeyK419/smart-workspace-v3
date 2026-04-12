@@ -1,32 +1,40 @@
 <template>
   <header class="header">
-    <div class="breadcrumbs">
-      <RouterLink to="/" class="breadcrumb-item">Главная</RouterLink>
-      <span class="breadcrumb-sep">›</span>
+    <div class="header-left">
+      <button class="header-btn mobile-only" :aria-expanded="sidebarOpen" title="Меню" @click="$emit('toggle-sidebar')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 7h16M4 12h16M4 17h16"/>
+        </svg>
+      </button>
 
-      <template v-if="route.name === 'dashboard'">
-        <span class="breadcrumb-current">Обзор</span>
-      </template>
-
-      <template v-else-if="route.name === 'course' && currentCourse">
-        <span class="breadcrumb-item" @click="router.push('/')">Курсы</span>
+      <div class="breadcrumbs">
+        <RouterLink to="/" class="breadcrumb-item">Главная</RouterLink>
         <span class="breadcrumb-sep">›</span>
-        <span class="breadcrumb-current">{{ currentCourse.name }}</span>
-      </template>
 
-      <template v-else-if="route.name === 'schedule'">
-        <span class="breadcrumb-current">Расписание</span>
-      </template>
+        <template v-if="route.name === 'dashboard'">
+          <span class="breadcrumb-current">Обзор</span>
+        </template>
 
-      <template v-else-if="route.name === 'projects'">
-        <span class="breadcrumb-current">Командные проекты</span>
-      </template>
+        <template v-else-if="route.name === 'course' && currentCourse">
+          <span class="breadcrumb-item" @click="router.push('/')">Курсы</span>
+          <span class="breadcrumb-sep">›</span>
+          <span class="breadcrumb-current">{{ currentCourse.name }}</span>
+        </template>
 
-      <template v-else-if="route.name === 'project' && currentProject">
-        <RouterLink to="/projects" class="breadcrumb-item">Проекты</RouterLink>
-        <span class="breadcrumb-sep">›</span>
-        <span class="breadcrumb-current">{{ currentProject.name }}</span>
-      </template>
+        <template v-else-if="route.name === 'schedule'">
+          <span class="breadcrumb-current">Расписание</span>
+        </template>
+
+        <template v-else-if="route.name === 'project' && currentProject">
+          <span class="breadcrumb-item" @click="router.push('/')">Командные проекты</span>
+          <span class="breadcrumb-sep">›</span>
+          <span class="breadcrumb-current">{{ currentProject.name }}</span>
+        </template>
+
+        <template v-else-if="route.name === 'settings'">
+          <span class="breadcrumb-current">Настройки</span>
+        </template>
+      </div>
     </div>
 
     <div class="header-right">
@@ -43,6 +51,15 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
+
+defineProps({
+  sidebarOpen: {
+    type: Boolean,
+    default: false,
+  },
+})
+
+defineEmits(['toggle-sidebar'])
 
 const route = useRoute()
 const router = useRouter()
@@ -61,12 +78,20 @@ const currentProject = computed(() =>
 .header {
   height: var(--header-h);
   min-height: var(--header-h);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 28px;
+  backdrop-filter: blur(14px);
+}
+
+.header-left {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .breadcrumbs {
@@ -74,6 +99,8 @@ const currentProject = computed(() =>
   align-items: center;
   gap: 6px;
   font-size: 13px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .breadcrumb-item {
@@ -81,6 +108,7 @@ const currentProject = computed(() =>
   cursor: pointer;
   transition: color var(--transition);
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .breadcrumb-item:hover {
@@ -94,6 +122,9 @@ const currentProject = computed(() =>
 .breadcrumb-current {
   color: var(--text-primary);
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header-right {
@@ -124,5 +155,40 @@ const currentProject = computed(() =>
   width: 16px;
   height: 16px;
   color: var(--text-secondary);
+}
+
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 980px) {
+  .header {
+    padding: 0 16px;
+  }
+
+  .mobile-only {
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+
+  .breadcrumbs {
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .breadcrumb-sep,
+  .breadcrumb-item:first-child {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .header {
+    gap: 10px;
+  }
+
+  .header-right {
+    gap: 8px;
+  }
 }
 </style>

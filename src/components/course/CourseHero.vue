@@ -8,7 +8,6 @@
       <div class="course-hero-name">{{ course.name }}</div>
       <div class="course-hero-meta">{{ course.teacher }} · {{ course.semester }}</div>
       <div class="course-hero-badges">
-        <span class="badge">{{ course.credits }} кредита</span>
         <span class="badge">{{ (course.assignments || []).length }} заданий</span>
         <span class="badge badge-active">Активный</span>
       </div>

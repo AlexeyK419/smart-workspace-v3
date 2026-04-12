@@ -5,7 +5,7 @@
         <div class="card-title">Командные проекты</div>
         <div class="overview-sub">Общие задачи, материалы и обсуждения команды</div>
       </div>
-      <RouterLink to="/projects" class="link-btn">Открыть</RouterLink>
+      <span class="link-btn muted">Список</span>
     </div>
 
     <div v-if="!store.projects.length" class="empty-state">
@@ -48,10 +48,12 @@ function openTasks(project) {
   font-size: 12px;
 }
 .link-btn {
-  text-decoration: none;
   color: var(--accent);
   font-size: 12px;
   font-weight: 600;
+}
+.link-btn.muted {
+  color: var(--text-muted);
 }
 .project-row {
   display: grid;

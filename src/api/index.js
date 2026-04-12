@@ -79,6 +79,8 @@ export const api = {
   logout:   ()     => request('POST', '/auth/logout'),
 
   getCurrentUser: () => request('GET', '/users/me'),
+  updateCurrentUser: (data) => request('PATCH', '/users/me', data),
+  updatePassword: (data) => request('POST', '/users/me/password', data),
   getCourses:     () => request('GET', '/users/me/courses'),
   searchUsers:    (query) => request('GET', `/users/search?q=${encodeURIComponent(query)}`),
 

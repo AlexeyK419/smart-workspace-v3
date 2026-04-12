@@ -161,9 +161,9 @@ function renderMd(text) {
   width: 56px;
   height: 56px;
   border-radius: 16px;
-  background: var(--text-primary);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--chat-fab-bg);
+  color: var(--chat-fab-fg);
+  border: 1px solid var(--chat-fab-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -199,7 +199,7 @@ function renderMd(text) {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: linear-gradient(180deg, #fff, #fbfaf7);
+  background: var(--chat-header-bg);
 }
 .assistant-avatar,
 .msg-avatar {

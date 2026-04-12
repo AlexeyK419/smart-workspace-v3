@@ -29,6 +29,15 @@ class AuthResponse(BaseModel):
     user: UserOut
 
 
+class UserProfileUpdateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+
+
+class UserPasswordUpdateRequest(BaseModel):
+    current_password: str = Field(min_length=6)
+    new_password: str = Field(min_length=6)
+
+
 class CourseCreate(BaseModel):
     name: str
     color: str = "#3d52d5"

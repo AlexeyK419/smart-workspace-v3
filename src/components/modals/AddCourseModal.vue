@@ -21,10 +21,6 @@
           <input class="form-input" v-model="form.semester" placeholder="Весна 2025" />
         </div>
         <div class="form-group">
-          <label class="form-label">Кредиты</label>
-          <input class="form-input" type="number" min="1" max="10" v-model.number="form.credits" />
-        </div>
-        <div class="form-group">
           <label class="form-label">Цвет курса</label>
           <div class="color-options">
             <div v-for="c in COLORS" :key="c" class="color-opt"
@@ -53,7 +49,7 @@ const store = useWorkspaceStore()
 const saving = ref(false)
 
 const COLORS = ['#3d52d5','#e05c2f','#2d7a4f','#b45309','#7c3aed','#0891b2','#db2777','#64748b']
-const form = reactive({ name: '', teacher: '', semester: 'Весна 2025', credits: 3, color: '#3d52d5' })
+const form = reactive({ name: '', teacher: '', semester: 'Весна 2025', color: '#3d52d5' })
 
 async function submit() {
   if (!form.name) return

@@ -172,8 +172,12 @@ async function submitRegister() {
   gap: 28px;
   padding: 28px;
   background:
-    radial-gradient(circle at top left, rgba(61, 82, 213, 0.08), transparent 28%),
-    linear-gradient(180deg, #f7f5ef 0%, #f2ede3 100%);
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 18%, transparent), transparent 34%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg) 90%, var(--surface)) 0%,
+      color-mix(in srgb, var(--bg) 96%, var(--surface-2)) 100%
+    );
 }
 .hero-badge {
   display: inline-flex;
@@ -181,8 +185,8 @@ async function submitRegister() {
   gap: 8px;
   padding: 8px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid var(--border-soft);
   color: var(--accent);
   font-weight: 600;
   font-size: 13px;
@@ -190,11 +194,11 @@ async function submitRegister() {
 }
 .welcome-hero,
 .auth-card {
-  background: rgba(255, 255, 255, 0.76);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
   backdrop-filter: blur(14px);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--border-soft);
   border-radius: 30px;
-  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.08);
+  box-shadow: var(--shadow-lg);
 }
 .welcome-hero {
   padding: 46px;
@@ -227,8 +231,8 @@ async function submitRegister() {
   align-items: start;
   padding: 18px;
   border-radius: 22px;
-  background: rgba(248, 250, 252, 0.86);
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: color-mix(in srgb, var(--surface-2) 84%, transparent);
+  border: 1px solid var(--border-soft);
 }
 .point-card span {
   width: 46px;
@@ -236,7 +240,7 @@ async function submitRegister() {
   border-radius: 14px;
   display: grid;
   place-items: center;
-  background: white;
+  background: var(--surface);
   font-size: 22px;
 }
 .point-card strong {
@@ -303,15 +307,20 @@ input {
   height: 50px;
   border-radius: 14px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--text-primary);
   padding: 0 14px;
   font-size: 14px;
   outline: none;
   transition: border-color .2s ease, box-shadow .2s ease;
 }
+input::placeholder {
+  color: var(--text-muted);
+}
 input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px rgba(61, 82, 213, 0.12);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .auth-submit {
   height: 52px;
@@ -330,15 +339,15 @@ input:focus {
 }
 .auth-error {
   border-radius: 14px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.18);
-  color: #b91c1c;
+  background: var(--danger-bg);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  color: var(--danger);
   padding: 12px 14px;
   font-size: 13px;
 }
 .auth-hint {
   border-radius: 14px;
-  background: rgba(15, 23, 42, 0.04);
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent);
   color: var(--text-secondary);
   font-size: 12.5px;
   line-height: 1.6;

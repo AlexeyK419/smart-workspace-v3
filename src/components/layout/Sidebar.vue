@@ -1,5 +1,5 @@
 <template>
-  <aside class="sidebar">
+  <aside class="sidebar" :class="{ open }">
     <div class="sidebar-logo">
       <div class="logo-mark">
         <svg viewBox="0 0 24 24"><path d="M12 3L2 8.5V15.5L12 21L22 15.5V8.5L12 3ZM12 5.15L20 9.5V15L12 18.85L4 15V9.5L12 5.15Z" fill="white"/></svg>
@@ -8,24 +8,24 @@
         <div class="logo-text">WorkSpace</div>
         <div class="logo-sub">Student Platform</div>
       </div>
+      <button class="sidebar-close" type="button" aria-label="Закрыть меню" @click="emitClose">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 6l12 12M18 6 6 18"/>
+        </svg>
+      </button>
     </div>
 
     <nav class="sidebar-nav">
       <div class="nav-section-label">Навигация</div>
 
-      <RouterLink to="/" class="nav-item" active-class="active">
+      <RouterLink to="/" class="nav-item" active-class="active" @click="emitClose">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
         Главная
       </RouterLink>
 
-      <RouterLink to="/schedule" class="nav-item" active-class="active">
+      <RouterLink to="/schedule" class="nav-item" active-class="active" @click="emitClose">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm-8 4H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>
         Расписание
-      </RouterLink>
-
-      <RouterLink to="/projects" class="nav-item" active-class="active">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-        Проекты
       </RouterLink>
 
       <div class="nav-section-label" style="margin-top: 8px">Курсы</div>
@@ -49,6 +49,7 @@
           :to="`/course/${course.id}`"
           class="course-item"
           active-class="active"
+          @click="emitClose"
         >
           <div class="course-dot" :style="{ background: course.color }"></div>
           {{ course.name }}
@@ -64,13 +65,27 @@
 
       <div class="nav-section-label" style="margin-top: 8px">Командная работа</div>
 
-      <div class="project-list">
+      <div class="courses-header" @click="projectsOpen = !projectsOpen">
+        <div class="courses-header-left">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;opacity:.7">
+            <path d="M4 5h16v10H4zM2 3v14h20V3H2Zm4 16h12v2H6z"/>
+          </svg>
+          Командные проекты
+        </div>
+        <svg class="chevron" :class="{ open: projectsOpen }" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+        </svg>
+      </div>
+
+      <div class="project-list" :class="projectsOpen ? 'expanded' : 'collapsed'">
+
         <RouterLink
           v-for="project in previewProjects"
           :key="project.id"
           :to="`/projects/${project.id}`"
           class="project-item"
           active-class="active"
+          @click="emitClose"
         >
           <div class="project-dot" :style="{ background: project.color }"></div>
           <div class="project-copy">
@@ -79,17 +94,22 @@
           </div>
         </RouterLink>
 
-        <RouterLink to="/projects" class="project-more">Все проекты</RouterLink>
+        <button class="add-course-btn" type="button" @click.stop="openProjectModal">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+          </svg>
+          Новый проект
+        </button>
       </div>
 
       <div class="nav-section-label" style="margin-top: 8px">Другое</div>
 
-      <div class="nav-item" @click="store.showToast('Настройки в разработке')">
+      <RouterLink to="/settings" class="nav-item" active-class="active" @click="emitClose">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22l-1.92 3.32c-.12.22-.07.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
         </svg>
         Настройки
-      </div>
+      </RouterLink>
     </nav>
 
     <div class="sidebar-profile">
@@ -106,6 +126,58 @@
         </svg>
       </button>
     </div>
+
+    <div v-if="projectModalOpen" class="modal-overlay" @click.self="closeProjectModal">
+      <div class="modal" style="max-width: 440px">
+        <div class="modal-header">
+          <div class="modal-title">Новый проект</div>
+          <button class="modal-close" type="button" @click="closeProjectModal">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+        </div>
+        <form class="modal-body project-form" @submit.prevent="submitProject">
+          <div class="form-group">
+            <label class="form-label">Название проекта *</label>
+            <input
+              v-model.trim="projectForm.name"
+              class="form-input"
+              type="text"
+              placeholder="Например: Дипломный проект"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Описание</label>
+            <textarea
+              v-model.trim="projectForm.description"
+              class="form-input textarea-input"
+              rows="3"
+              placeholder="Коротко опишите цель и формат работы"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Цвет проекта</label>
+            <div class="color-row">
+              <button
+                v-for="color in colorOptions"
+                :key="color"
+                type="button"
+                class="color-btn"
+                :class="{ active: projectForm.color === color }"
+                :style="{ background: color }"
+                @click="projectForm.color = color"
+              />
+            </div>
+          </div>
+        </form>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" type="button" @click="closeProjectModal">Отмена</button>
+          <button class="btn btn-primary" type="button" :disabled="creatingProject" @click="submitProject">
+            {{ creatingProject ? 'Создаём...' : 'Создать проект' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </aside>
 </template>
 
@@ -115,15 +187,59 @@ import { useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useAuthStore } from '@/stores/auth'
 
+defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
+})
+
+const emit = defineEmits(['close'])
+
 const store = useWorkspaceStore()
 const authStore = useAuthStore()
 const router = useRouter()
 const coursesOpen = ref(true)
+const projectsOpen = ref(true)
 const openAddCourse = inject('openAddCourse')
+const projectModalOpen = ref(false)
+const creatingProject = ref(false)
+const projectForm = ref({
+  name: '',
+  description: '',
+  color: '#7c3aed',
+})
 
+const colorOptions = ['#7c3aed', '#3d52d5', '#2d7a4f', '#b45309', '#0891b2', '#dc2626']
 const previewProjects = computed(() => store.projects.slice(0, 4))
 
+function emitClose() {
+  emit('close')
+}
+
+function openProjectModal() {
+  projectModalOpen.value = true
+}
+
+function closeProjectModal() {
+  projectModalOpen.value = false
+}
+
+async function submitProject() {
+  creatingProject.value = true
+  try {
+    const created = await store.createProject({ ...projectForm.value })
+    projectForm.value = { name: '', description: '', color: '#7c3aed' }
+    closeProjectModal()
+    emitClose()
+    router.push(`/projects/${created.id}`)
+  } finally {
+    creatingProject.value = false
+  }
+}
+
 async function logout() {
+  emitClose()
   await authStore.logout()
   router.replace('/welcome')
 }
@@ -133,13 +249,34 @@ async function logout() {
 .sidebar {
   width: var(--sidebar-w);
   min-width: var(--sidebar-w);
-  background: var(--surface);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent) 0%, color-mix(in srgb, var(--surface) 88%, transparent) 100%);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
   z-index: 10;
+  backdrop-filter: blur(16px);
+}
+
+.sidebar-close {
+  display: none;
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-close svg {
+  width: 16px;
+  height: 16px;
 }
 .sidebar-logo {
   padding: 22px 20px 18px;
@@ -257,8 +394,7 @@ async function logout() {
 .courses-list.collapsed { max-height: 0; }
 .course-item,
 .add-course-btn,
-.project-item,
-.project-more {
+.project-item {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -274,8 +410,7 @@ async function logout() {
 }
 .course-item:hover,
 .add-course-btn:hover,
-.project-item:hover,
-.project-more:hover {
+.project-item:hover {
   background: var(--surface-2);
 }
 .course-item.active,
@@ -301,12 +436,17 @@ async function logout() {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.project-copy small,
-.project-more {
+.project-copy small {
   color: var(--text-muted);
   font-size: 11px;
 }
-.project-list { display: grid; }
+.project-list {
+  display: grid;
+  overflow: hidden;
+  transition: max-height .2s ease;
+}
+.project-list.expanded { max-height: 520px; }
+.project-list.collapsed { max-height: 0; }
 .sidebar-profile {
   padding: 16px;
   border-top: 1px solid var(--border-soft);
@@ -353,5 +493,49 @@ async function logout() {
   width: 16px;
   height: 16px;
   color: var(--text-secondary);
+}
+.project-form {
+  display: block;
+}
+.textarea-input {
+  resize: vertical;
+}
+.color-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.color-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+.color-btn.active {
+  border-color: var(--text-primary);
+}
+
+@media (max-width: 980px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    height: 100dvh;
+    max-width: min(86vw, 320px);
+    transform: translateX(-100%);
+    transition: transform var(--transition);
+    z-index: 30;
+    box-shadow: none;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .sidebar-close {
+    display: inline-flex;
+  }
+
 }
 </style>

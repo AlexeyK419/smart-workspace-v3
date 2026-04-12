@@ -54,6 +54,7 @@
           >
             <div class="event-title">{{ event.title }}</div>
             <div class="event-time">{{ event.startTime }} — {{ event.endTime }}</div>
+            <div v-if="event.teacher" class="event-teacher">{{ event.teacher }}</div>
             <div v-if="event.location" class="event-location">📍 {{ event.location }}</div>
           </div>
         </div>
@@ -494,9 +495,13 @@ function formatMinute(minute) {
   margin-bottom: 2px;
 }
 .event-time,
+.event-teacher,
 .event-location {
   font-size: 10px;
   color: var(--text-muted);
+}
+.event-teacher {
+  margin-top: 2px;
 }
 .event-location {
   margin-top: 2px;

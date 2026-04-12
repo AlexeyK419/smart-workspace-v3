@@ -22,10 +22,6 @@
             <input class="form-input" v-model="editForm.semester" />
           </div>
           <div class="form-group" style="flex:1">
-            <label class="form-label">Кредиты</label>
-            <input class="form-input" type="number" min="1" max="10" v-model.number="editForm.credits" />
-          </div>
-          <div class="form-group" style="flex:1">
             <label class="form-label">Прогресс (%)</label>
             <input class="form-input" type="number" min="0" max="100" v-model.number="editForm.progress" />
           </div>
@@ -126,7 +122,7 @@ const showUpload     = ref(false)
 const aiHelpTarget   = ref(null)
 const showEditCourse = ref(false)
 
-const editForm = reactive({ name: '', teacher: '', semester: '', credits: 3, progress: 0, color: '#3d52d5' })
+const editForm = reactive({ name: '', teacher: '', semester: '', progress: 0, color: '#3d52d5' })
 
 const course = computed(() =>
   store.courses.find((c) => String(c.id) === String(route.params.id))
@@ -140,7 +136,6 @@ watch(showEditCourse, (v) => {
       name: course.value.name,
       teacher: course.value.teacher,
       semester: course.value.semester,
-      credits: course.value.credits,
       progress: course.value.progress,
       color: course.value.color,
     })

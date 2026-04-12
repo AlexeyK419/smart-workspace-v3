@@ -312,7 +312,11 @@ function next() {
   padding: 14px;
   border: 1px solid var(--border-soft);
   border-radius: 14px;
-  background: linear-gradient(180deg, #fff, #fbfaf7);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 96%, transparent),
+    color-mix(in srgb, var(--surface-2) 88%, transparent)
+  );
 }
 .cal-days-header,
 .cal-grid {

@@ -4,6 +4,13 @@
   <div v-else class="project-page">
     <section class="project-hero" :style="heroStyle">
       <div class="hero-copy">
+        <button
+          v-if="isOwner"
+          class="btn btn-primary hero-edit-btn"
+          @click="openProjectEditModal"
+        >
+          Редактировать
+        </button>
         <div class="hero-badge">{{ isOwner ? 'Владелец проекта' : 'Участник проекта' }}</div>
         <h1>{{ project.name }}</h1>
         <p>{{ project.description || 'Добавь описание проекта, чтобы команда понимала цель, сроки и ближайшие шаги.' }}</p>
@@ -33,36 +40,7 @@
             <strong>{{ completionRate }}%</strong>
           </div>
         </div>
-      </div>
 
-      <div v-if="isOwner" class="hero-settings card">
-        <div class="card-title">Параметры проекта</div>
-        <div class="form-group">
-          <label class="form-label">Название</label>
-          <input v-model.trim="projectForm.name" class="input" type="text" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Описание</label>
-          <textarea v-model.trim="projectForm.description" class="textarea" rows="3"></textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Цвет</label>
-          <div class="color-row">
-            <button
-              v-for="color in colorOptions"
-              :key="color"
-              type="button"
-              class="color-btn"
-              :class="{ active: projectForm.color === color }"
-              :style="{ background: color }"
-              @click="projectForm.color = color"
-            />
-          </div>
-        </div>
-        <div class="settings-actions">
-          <button class="btn btn-ghost" @click="resetProjectForm">Сбросить</button>
-          <button class="btn btn-primary" @click="saveProject">Сохранить</button>
-        </div>
       </div>
     </section>
 
@@ -73,40 +51,6 @@
     </div>
 
     <section v-if="activeTab === 'tasks'" class="tasks-shell">
-      <div class="task-create card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Новая задача</div>
-            <div class="section-sub">Добавляй задачи, распределяй ответственность и веди проект в одном месте.</div>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Название</label>
-          <input v-model.trim="taskForm.title" class="input" type="text" placeholder="Например, сверстать главную страницу" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Описание</label>
-          <textarea v-model.trim="taskForm.description" class="textarea" rows="4" placeholder="Что именно нужно сделать и какой ожидается результат"></textarea>
-        </div>
-        <div class="row-2">
-          <div class="form-group">
-            <label class="form-label">Срок</label>
-            <input v-model="taskForm.due_date" class="input" type="datetime-local" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Исполнитель</label>
-            <select v-model="taskForm.assignee_id" class="input">
-              <option value="">Без исполнителя</option>
-              <option v-for="member in project.members || []" :key="member.id" :value="String(member.user_id)">
-                {{ member.user.name }}
-              </option>
-            </select>
-          </div>
-        </div>
-        <button class="btn btn-primary wide-btn" @click="createTask">Добавить задачу</button>
-      </div>
-
       <div class="tasks-main">
         <div class="task-toolbar card">
           <div class="toolbar-main">
@@ -114,8 +58,11 @@
               <div class="card-title">Рабочая доска</div>
               <div class="section-sub">Поиск, быстрые фильтры и актуальная картина по задачам команды.</div>
             </div>
-            <div class="toolbar-search">
-              <input v-model.trim="taskSearch" class="input" type="text" placeholder="Поиск по задаче или описанию" />
+            <div class="toolbar-controls">
+              <div class="toolbar-search">
+                <input v-model.trim="taskSearch" class="input" type="text" placeholder="Поиск по задаче или описанию" />
+              </div>
+              <button class="btn btn-primary" @click="openTaskCreateModal">Добавить задачу</button>
             </div>
           </div>
 
@@ -171,7 +118,7 @@
                 >
                   <div class="tile-top">
                     <button class="check-pill" :class="{ active: task.status === 'done' }" @click.stop="toggleTaskDone(task)">
-                      {{ task.status === 'done' ? '✓ Выполнено' : 'Отметить готовой' }}
+                      {{ task.status === 'done' ? 'Выполнено' : 'Отметить готовой' }}
                     </button>
                     <span class="tile-deadline" :class="taskDeadlineClass(task)">{{ taskDeadlineLabel(task) }}</span>
                   </div>
@@ -181,7 +128,7 @@
 
                   <div class="tile-meta">
                     <div class="member-pill">
-                      <span class="avatar-mini">{{ task.assignee?.initials || '??' }}</span>
+                      <span class="avatar-mini">{{ task.assignee?.initials || 'УЧ' }}</span>
                       <span>{{ task.assignee?.name || 'Без исполнителя' }}</span>
                     </div>
                     <div class="tile-side-metrics">
@@ -193,98 +140,6 @@
               </div>
             </article>
           </div>
-
-          <aside class="task-detail card" v-if="selectedTask">
-            <div class="detail-head">
-              <div>
-                <div class="detail-label">Карточка задачи</div>
-                <h3>{{ selectedTask.title }}</h3>
-              </div>
-              <button class="icon-btn danger" @click="removeTask(selectedTask)">×</button>
-            </div>
-
-            <div class="detail-badges">
-              <span class="status-chip" :class="taskStatusTone(selectedTask.status)">{{ store.projectTaskStatusLabel(selectedTask.status) }}</span>
-              <span class="meta-chip" v-if="selectedTask.completedAt">Закрыта {{ formatShortDate(selectedTask.completedAt) }}</span>
-              <span class="meta-chip">Создал {{ selectedTask.creator?.name || 'Участник' }}</span>
-            </div>
-
-            <div class="detail-section">
-              <label class="form-label">Описание</label>
-              <textarea
-                class="textarea"
-                rows="5"
-                :value="selectedTask.description"
-                @change="changeTaskDescription(selectedTask, $event.target.value)"
-                placeholder="Что нужно сделать, какие есть ограничения и критерии готовности"
-              />
-            </div>
-
-            <div class="detail-grid">
-              <label>
-                <span>Статус</span>
-                <select class="input" :value="selectedTask.status" @change="changeTaskStatus(selectedTask, $event.target.value)">
-                  <option value="todo">К выполнению</option>
-                  <option value="in_progress">В работе</option>
-                  <option value="done">Готово</option>
-                </select>
-              </label>
-              <label>
-                <span>Исполнитель</span>
-                <select class="input" :value="selectedTask.assignee_id ? String(selectedTask.assignee_id) : ''" @change="changeTaskAssignee(selectedTask, $event.target.value)">
-                  <option value="">Без исполнителя</option>
-                  <option v-for="member in project.members || []" :key="member.id" :value="String(member.user_id)">
-                    {{ member.user.name }}
-                  </option>
-                </select>
-              </label>
-              <label>
-                <span>Срок</span>
-                <input class="input" type="datetime-local" :value="toDateTimeLocal(selectedTask.due_date)" @change="changeTaskDueDate(selectedTask, $event.target.value)" />
-              </label>
-            </div>
-
-            <div class="detail-actions">
-              <button class="btn btn-ghost" @click="setTaskInProgress(selectedTask)">Взять в работу</button>
-              <button class="btn btn-primary" @click="toggleTaskDone(selectedTask)">
-                {{ selectedTask.status === 'done' ? 'Вернуть в работу' : 'Отметить выполненной' }}
-              </button>
-            </div>
-
-            <div class="detail-section">
-              <div class="comment-head">
-                <div>
-                  <div class="form-label">Комментарии</div>
-                  <div class="section-sub">Обсуждение по задаче и договорённости команды.</div>
-                </div>
-                <strong>{{ selectedTask.comments?.length || 0 }}</strong>
-              </div>
-
-              <div class="task-comments">
-                <div v-if="!(selectedTask.comments?.length)" class="state-card compact">Пока нет комментариев. Добавь первый апдейт по задаче.</div>
-                <div v-for="comment in selectedTask.comments" :key="comment.id" class="comment-card">
-                  <div class="comment-avatar">{{ comment.author?.initials || 'WS' }}</div>
-                  <div class="comment-body">
-                    <div class="comment-meta">
-                      <strong>{{ comment.author?.name || 'Участник' }}</strong>
-                      <span>{{ formatDateTime(comment.createdAt || comment.created_at) }}</span>
-                    </div>
-                    <p>{{ comment.body }}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="comment-compose">
-                <textarea v-model.trim="commentDraft" class="textarea" rows="3" placeholder="Например: обновил экран, осталось подключить API" />
-                <button class="btn btn-primary" @click="submitComment">Добавить комментарий</button>
-              </div>
-            </div>
-          </aside>
-
-          <aside v-else class="task-detail card empty-detail">
-            <div class="card-title">Выбери задачу</div>
-            <p class="section-sub">Открой карточку справа, чтобы поменять статус, срок, исполнителя или оставить комментарий.</p>
-          </aside>
         </div>
       </div>
     </section>
@@ -429,16 +284,186 @@
         </div>
       </div>
     </section>
+
+    <div v-if="isProjectEditModalOpen" class="modal-backdrop" @click.self="closeProjectEditModal">
+      <section class="modal-window card" :style="heroStyle">
+        <div class="detail-head">
+          <div>
+            <div class="detail-label">Параметры проекта</div>
+            <h3>Редактирование проекта</h3>
+          </div>
+          <button class="btn btn-ghost" @click="closeProjectEditModal">Закрыть</button>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Название</label>
+          <input v-model.trim="projectForm.name" class="input" type="text" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Описание</label>
+          <textarea v-model.trim="projectForm.description" class="textarea" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Цвет</label>
+          <div class="color-row">
+            <button
+              v-for="color in colorOptions"
+              :key="color"
+              type="button"
+              class="color-btn"
+              :class="{ active: projectForm.color === color }"
+              :style="{ background: color }"
+              @click="projectForm.color = color"
+            />
+          </div>
+        </div>
+        <div class="settings-actions">
+          <button class="btn btn-danger-outline" @click="deleteProject">Удалить проект</button>
+          <button class="btn btn-primary" @click="saveProject">Сохранить</button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="isTaskCreateModalOpen" class="modal-backdrop" @click.self="closeTaskCreateModal">
+      <section class="modal-window card">
+        <div class="detail-head">
+          <div>
+            <div class="detail-label">Новая задача</div>
+            <h3>Добавить задачу</h3>
+          </div>
+          <button class="btn btn-ghost" @click="closeTaskCreateModal">Закрыть</button>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Название</label>
+          <input v-model.trim="taskForm.title" class="input" type="text" placeholder="Например, сверстать главную страницу" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Описание</label>
+          <textarea v-model.trim="taskForm.description" class="textarea" rows="4" placeholder="Что именно нужно сделать и какой ожидается результат"></textarea>
+        </div>
+        <div class="row-2">
+          <div class="form-group">
+            <label class="form-label">Срок</label>
+            <input v-model="taskForm.due_date" class="input" type="datetime-local" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Исполнитель</label>
+            <select v-model="taskForm.assignee_id" class="input">
+              <option value="">Без исполнителя</option>
+              <option v-for="member in project.members || []" :key="member.id" :value="String(member.user_id)">
+                {{ member.user.name }}
+              </option>
+            </select>
+          </div>
+        </div>
+        <div class="settings-actions">
+          <button class="btn btn-ghost" @click="closeTaskCreateModal">Отмена</button>
+          <button class="btn btn-primary" @click="createTask">Создать задачу</button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="isTaskModalOpen && selectedTask" class="modal-backdrop" @click.self="closeTaskModal">
+      <section class="modal-window task-modal card">
+        <div class="detail-head">
+          <div>
+            <div class="detail-label">Карточка задачи</div>
+            <h3>{{ selectedTask.title }}</h3>
+          </div>
+          <button class="btn btn-ghost" @click="closeTaskModal">Закрыть</button>
+        </div>
+
+        <div class="detail-badges">
+          <span class="status-chip" :class="taskStatusTone(selectedTask.status)">{{ store.projectTaskStatusLabel(selectedTask.status) }}</span>
+          <span class="meta-chip" v-if="selectedTask.completedAt">Закрыта {{ formatShortDate(selectedTask.completedAt) }}</span>
+          <span class="meta-chip">Создал {{ selectedTask.creator?.name || 'Участник' }}</span>
+        </div>
+
+        <div class="detail-section">
+          <label class="form-label">Описание</label>
+          <textarea
+            class="textarea"
+            rows="5"
+            :value="selectedTask.description"
+            @change="changeTaskDescription(selectedTask, $event.target.value)"
+            placeholder="Что нужно сделать, какие есть ограничения и критерии готовности"
+          />
+        </div>
+
+        <div class="detail-grid">
+          <label>
+            <span>Статус</span>
+            <select class="input" :value="selectedTask.status" @change="changeTaskStatus(selectedTask, $event.target.value)">
+              <option value="todo">К выполнению</option>
+              <option value="in_progress">В работе</option>
+              <option value="done">Готово</option>
+            </select>
+          </label>
+          <label>
+            <span>Исполнитель</span>
+            <select class="input" :value="selectedTask.assignee_id ? String(selectedTask.assignee_id) : ''" @change="changeTaskAssignee(selectedTask, $event.target.value)">
+              <option value="">Без исполнителя</option>
+              <option v-for="member in project.members || []" :key="member.id" :value="String(member.user_id)">
+                {{ member.user.name }}
+              </option>
+            </select>
+          </label>
+          <label>
+            <span>Срок</span>
+            <input class="input" type="datetime-local" :value="toDateTimeLocal(selectedTask.due_date)" @change="changeTaskDueDate(selectedTask, $event.target.value)" />
+          </label>
+        </div>
+
+        <div class="detail-actions">
+          <button class="btn btn-ghost" @click="setTaskInProgress(selectedTask)">Перевести в работу</button>
+          <button class="btn btn-primary" @click="toggleTaskDone(selectedTask)">
+            {{ selectedTask.status === 'done' ? 'Вернуть в работу' : 'Отметить выполненной' }}
+          </button>
+          <button class="btn btn-danger-outline" @click="removeTask(selectedTask)">Удалить задачу</button>
+        </div>
+
+        <div class="detail-section">
+          <div class="comment-head">
+            <div>
+              <div class="form-label">Комментарии</div>
+              <div class="section-sub">Обсуждение по задаче и договорённости команды.</div>
+            </div>
+            <strong>{{ selectedTask.comments?.length || 0 }}</strong>
+          </div>
+
+          <div class="task-comments">
+            <div v-if="!(selectedTask.comments?.length)" class="state-card compact">Пока нет комментариев. Добавь первый апдейт по задаче.</div>
+            <div v-for="comment in selectedTask.comments" :key="comment.id" class="comment-card">
+              <div class="comment-avatar">{{ comment.author?.initials || 'УЧ' }}</div>
+              <div class="comment-body">
+                <div class="comment-meta">
+                  <strong>{{ comment.author?.name || 'Участник' }}</strong>
+                  <span>{{ formatDateTime(comment.createdAt || comment.created_at) }}</span>
+                </div>
+                <p>{{ comment.body }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="comment-compose">
+            <textarea v-model.trim="commentDraft" class="textarea" rows="3" placeholder="Например: обновил экран, осталось подключить интеграцию" />
+            <button class="btn btn-primary" @click="submitComment">Добавить комментарий</button>
+          </div>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { api } from '@/api/index.js'
 
 const route = useRoute()
+const router = useRouter()
 const store = useWorkspaceStore()
 const loading = ref(true)
 const loadError = ref(false)
@@ -453,6 +478,9 @@ const taskSearch = ref('')
 const taskFilter = ref('all')
 const selectedTaskId = ref(null)
 const commentDraft = ref('')
+const isTaskModalOpen = ref(false)
+const isTaskCreateModalOpen = ref(false)
+const isProjectEditModalOpen = ref(false)
 const connectionState = ref('offline')
 const onlineConnections = ref(0)
 const typingUsers = ref([])
@@ -540,12 +568,17 @@ watch(project, (value) => {
     color: value.color,
   }
   if (!value.tasks?.some((task) => task.id === selectedTaskId.value)) {
-    selectedTaskId.value = value.tasks?.[0]?.id ?? null
+    selectedTaskId.value = null
+    isTaskModalOpen.value = false
   }
 }, { immediate: true })
 
 watch(() => route.params.id, loadProject, { immediate: true })
 watch(activeTab, async (tab) => {
+  if (tab !== 'tasks') {
+    isTaskModalOpen.value = false
+    isTaskCreateModalOpen.value = false
+  }
   if (tab === 'chat' && project.value) {
     await loadMessages()
     connectChat()
@@ -567,7 +600,10 @@ async function loadProject() {
     messages.value = []
     typingUsers.value = []
     await store.fetchProject(projectId.value)
-    selectedTaskId.value = project.value?.tasks?.[0]?.id ?? null
+    selectedTaskId.value = null
+    isTaskModalOpen.value = false
+    isTaskCreateModalOpen.value = false
+    isProjectEditModalOpen.value = false
     if (activeTab.value === 'chat') {
       await loadMessages()
       connectChat()
@@ -581,6 +617,7 @@ async function loadProject() {
 
 async function saveProject() {
   await store.updateProject(projectId.value, { ...projectForm.value })
+  isProjectEditModalOpen.value = false
 }
 
 function resetProjectForm() {
@@ -590,6 +627,14 @@ function resetProjectForm() {
     description: project.value.description,
     color: project.value.color,
   }
+}
+
+async function deleteProject() {
+  if (!isOwner.value || !project.value) return
+  if (!confirm(`Удалить проект «${project.value.name}»? Это действие необратимо.`)) return
+  await store.deleteProject(projectId.value)
+  isProjectEditModalOpen.value = false
+  await router.push({ name: 'dashboard' })
 }
 
 async function createTask() {
@@ -603,10 +648,15 @@ async function createTask() {
   })
   taskForm.value = { title: '', description: '', due_date: '', assignee_id: '' }
   selectedTaskId.value = created?.id ?? selectedTaskId.value
+  isTaskCreateModalOpen.value = false
+  if (created?.id) {
+    isTaskModalOpen.value = true
+  }
 }
 
 function selectTask(task) {
   selectedTaskId.value = task.id
+  isTaskModalOpen.value = true
 }
 
 async function changeTaskStatus(task, status) {
@@ -644,8 +694,34 @@ async function removeTask(task) {
   if (!confirm(`Удалить задачу «${task.title}»?`)) return
   await store.deleteProjectTask(projectId.value, task.id)
   if (selectedTaskId.value === task.id) {
-    selectedTaskId.value = project.value?.tasks?.[0]?.id ?? null
+    selectedTaskId.value = null
+    isTaskModalOpen.value = false
+    commentDraft.value = ''
   }
+}
+
+function openProjectEditModal() {
+  if (!isOwner.value) return
+  resetProjectForm()
+  isProjectEditModalOpen.value = true
+}
+
+function closeProjectEditModal() {
+  isProjectEditModalOpen.value = false
+}
+
+function openTaskCreateModal() {
+  taskForm.value = { title: '', description: '', due_date: '', assignee_id: '' }
+  isTaskCreateModalOpen.value = true
+}
+
+function closeTaskCreateModal() {
+  isTaskCreateModalOpen.value = false
+}
+
+function closeTaskModal() {
+  isTaskModalOpen.value = false
+  commentDraft.value = ''
 }
 
 async function uploadSharedFile(event) {
@@ -910,22 +986,25 @@ function toDateTimeLocal(value) {
 .state-card.error { color: var(--danger); }
 .project-page { display: grid; gap: 18px; }
 .project-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) 360px;
-  gap: 18px;
-  align-items: start;
+  display: block;
 }
 .hero-copy {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--project-color) 14%, white) 0%, white 62%, color-mix(in srgb, var(--project-color) 8%, white) 100%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--project-color) 16%, var(--surface)) 0%,
+    var(--surface) 62%,
+    color-mix(in srgb, var(--project-color) 10%, var(--surface)) 100%
+  );
   border: 1px solid var(--border);
   border-radius: 28px;
   padding: 28px;
+  position: relative;
 }
 .hero-badge {
   display: inline-flex;
   padding: 7px 12px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.84);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
   color: var(--project-color);
   font-size: 12px;
   font-weight: 700;
@@ -963,13 +1042,20 @@ function toDateTimeLocal(value) {
 .metric-pill {
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(255,255,255,0.84);
-  border: 1px solid rgba(255,255,255,0.95);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--border-soft);
   display: grid;
   gap: 4px;
 }
-.metric-pill.soft { background: color-mix(in srgb, var(--project-color) 10%, white); }
-.hero-settings { border-radius: 26px; }
+.metric-pill.soft { background: color-mix(in srgb, var(--project-color) 12%, var(--surface)); }
+.hero-edit-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  padding: 7px 12px;
+  font-size: 12px;
+  border-radius: 10px;
+}
 .card-title { font-weight: 700; }
 .input,
 .textarea,
@@ -1012,6 +1098,14 @@ select.input:focus,
   align-items: center;
   gap: 10px;
 }
+.btn-danger-outline {
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, white);
+  color: var(--danger);
+  background: var(--surface);
+}
+.btn-danger-outline:hover {
+  background: color-mix(in srgb, var(--danger) 10%, white);
+}
 .tabs {
   display: flex;
   gap: 3px;
@@ -1035,17 +1129,7 @@ select.input:focus,
   box-shadow: 0 6px 18px rgba(26,23,20,0.08);
 }
 .tasks-shell {
-  display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
-}
-.task-create {
-  position: sticky;
-  top: 12px;
-  display: grid;
-  gap: 14px;
-  border-radius: 24px;
+  display: block;
 }
 .wide-btn { width: 100%; justify-content: center; }
 .tasks-main { display: grid; gap: 16px; }
@@ -1056,8 +1140,14 @@ select.input:focus,
 }
 .toolbar-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 520px);
   gap: 14px;
+  align-items: center;
+}
+.toolbar-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: center;
 }
 .smart-filters {
@@ -1090,15 +1180,12 @@ select.input:focus,
   padding: 12px 14px;
 }
 .kpi-box.success {
-  background: color-mix(in srgb, #16a34a 12%, white);
+  background: color-mix(in srgb, var(--success) 16%, var(--surface));
 }
 .kpi-box strong { display: block; font-size: 24px; }
 .kpi-box span { color: var(--text-muted); font-size: 12px; }
 .tasks-workbench {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 390px;
-  gap: 16px;
-  align-items: start;
+  display: block;
 }
 .kanban-board {
   display: grid;
@@ -1171,7 +1258,7 @@ select.input:focus,
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  align-items: center;
+  align-items: flex-start;
 }
 .check-pill,
 .tile-deadline,
@@ -1191,6 +1278,9 @@ select.input:focus,
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.3;
+  white-space: normal;
 }
 .check-pill.active {
   background: color-mix(in srgb, #16a34a 14%, white);
@@ -1247,17 +1337,6 @@ select.input:focus,
   margin-bottom: 4px;
 }
 .detail-head h3 { font-size: 24px; }
-.icon-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: transparent;
-  cursor: pointer;
-  font-size: 22px;
-  line-height: 1;
-}
-.icon-btn.danger { color: var(--danger); }
 .detail-badges,
 .detail-section,
 .task-comments,
@@ -1274,6 +1353,53 @@ select.input:focus,
   gap: 6px;
   font-size: 12px;
   color: var(--text-muted);
+}
+.detail-actions {
+  flex-wrap: wrap;
+}
+.detail-actions .btn {
+  flex: 1 1 190px;
+  justify-content: center;
+  text-align: center;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 24, 38, 0.5);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  z-index: 60;
+  animation: modal-fade-in 0.2s ease;
+}
+.modal-window {
+  width: min(860px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  border-radius: 24px;
+  display: grid;
+  gap: 14px;
+  animation: modal-window-in 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: top center;
+}
+.task-modal {
+  width: min(980px, 100%);
+}
+
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-window-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 .comment-card {
   display: grid;
@@ -1295,11 +1421,6 @@ select.input:focus,
 .comment-meta span { color: var(--text-muted); }
 .comment-body p,
 .message-bubble p { white-space: pre-wrap; }
-.empty-detail {
-  min-height: 220px;
-  align-content: center;
-  text-align: center;
-}
 .files-card { display: grid; gap: 14px; }
 .files-head { align-items: center; }
 .file-row,
@@ -1331,7 +1452,11 @@ select.input:focus,
   min-height: 720px;
 }
 .chat-thread {
-  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,247,255,0.92));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 94%, transparent),
+    color-mix(in srgb, var(--surface-2) 94%, transparent)
+  );
   border: 1px solid var(--border-soft);
   border-radius: 24px;
   padding: 18px;
@@ -1443,12 +1568,9 @@ select.input:focus,
 
 @media (max-width: 1320px) {
   .tasks-shell,
-  .tasks-workbench,
-  .project-hero,
   .members-grid {
     grid-template-columns: 1fr;
   }
-  .task-create { position: static; }
 }
 
 @media (max-width: 1080px) {
@@ -1457,7 +1579,8 @@ select.input:focus,
   .hero-stats,
   .hero-inline-metrics,
   .task-kpis,
-  .toolbar-main {
+  .toolbar-main,
+  .toolbar-controls {
     grid-template-columns: 1fr;
   }
 }

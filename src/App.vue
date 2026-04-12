@@ -32,16 +32,19 @@ import AddCourseModal from '@/components/modals/AddCourseModal.vue'
 import AiChatWidget from '@/components/widgets/AiChatWidget.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 
 const route = useRoute()
 const router = useRouter()
 const store = useWorkspaceStore()
 const authStore = useAuthStore()
+const uiStore = useUiStore()
 const showAddCourse = ref(false)
 
 provide('openAddCourse', () => (showAddCourse.value = true))
 
 onMounted(async () => {
+  uiStore.bootstrapTheme()
   await authStore.bootstrap()
 })
 
@@ -67,16 +70,19 @@ watch(
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background: linear-gradient(180deg, #f7f5ef 0%, #f3efe5 100%);
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 28%),
+    linear-gradient(180deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 84%, black) 100%);
 }
 .boot-card {
   width: min(420px, calc(100vw - 32px));
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  border: 1px solid var(--border);
   border-radius: 28px;
   padding: 32px;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  box-shadow: var(--shadow-lg);
   text-align: center;
+  backdrop-filter: blur(16px);
 }
 .boot-logo {
   width: 58px;
@@ -104,12 +110,13 @@ watch(
   bottom: 90px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--text-primary);
-  color: white;
+  background: color-mix(in srgb, var(--text-primary) 92%, transparent);
+  color: var(--surface);
   padding: 10px 18px;
   border-radius: 10px;
   font-size: 13px;
   z-index: 200;
   white-space: nowrap;
+  box-shadow: var(--shadow-lg);
 }
 </style>
