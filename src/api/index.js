@@ -1,5 +1,7 @@
 const BASE = 'http://localhost:8000'
 const TOKEN_KEY = 'workspace_token'
+const DEFAULT_TIMEOUT_MS = 15000
+const AI_TIMEOUT_MS = 45000
 
 let authToken = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) || '' : ''
 
@@ -49,8 +51,16 @@ export async function downloadWithAuth(path, fallbackName = 'download') {
   window.URL.revokeObjectURL(url)
 }
 
+function resolveTimeout(path) {
+  return path.startsWith('/ai/') ? AI_TIMEOUT_MS : DEFAULT_TIMEOUT_MS
+}
+
 async function request(method, path, body = null) {
   const opts = { method, headers: {} }
+  const controller = new AbortController()
+  const timeoutMs = resolveTimeout(path)
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  opts.signal = controller.signal
 
   if (authToken) {
     opts.headers.Authorization = `Bearer ${authToken}`
@@ -63,7 +73,18 @@ async function request(method, path, body = null) {
     opts.body = body
   }
 
-  const res = await fetch(`${BASE}${path}`, opts)
+  let res
+  try {
+    res = await fetch(`${BASE}${path}`, opts)
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('Превышено время ожидания ответа сервера')
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || 'API error')

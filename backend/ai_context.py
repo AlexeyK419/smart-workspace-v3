@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import os
+import re
 import zipfile
-from collections import defaultdict
+from collections import Counter, OrderedDict, defaultdict
+from dataclasses import dataclass
 from datetime import datetime
 import xml.etree.ElementTree as ET
 
@@ -28,63 +30,148 @@ TEXT_EXTENSIONS = {
     ".log",
 }
 
-COURSE_FILE_TEXT_LIMIT = 1400
-ASSIGNMENT_FILE_TEXT_LIMIT = 1400
-PROJECT_FILE_TEXT_LIMIT = 1400
-COMMENT_TEXT_LIMIT = 320
-MESSAGE_TEXT_LIMIT = 280
+WORKSPACE_SUMMARY_CONTEXT_CHAR_LIMIT = 30_000
+CHAT_CONTEXT_CHAR_LIMIT = 22_000
+PROJECT_SUMMARY_CONTEXT_CHAR_LIMIT = 24_000
+COURSE_PLAN_CONTEXT_CHAR_LIMIT = 22_000
+ASSIGNMENT_HELP_CONTEXT_CHAR_LIMIT = 18_000
 
-MAX_TASK_COMMENTS_IN_CONTEXT = 8
-MAX_PROJECT_MESSAGES_IN_CONTEXT = 20
+CHAT_RECENT_MESSAGES_LIMIT = 8
+CHAT_OLD_HISTORY_SUMMARY_LIMIT = 2_600
 
-WORKSPACE_CONTEXT_CHAR_LIMIT = 110_000
-CHAT_CONTEXT_CHAR_LIMIT = 55_000
-PROJECT_CONTEXT_CHAR_LIMIT = 75_000
-COURSE_CONTEXT_CHAR_LIMIT = 55_000
-ASSIGNMENT_CONTEXT_CHAR_LIMIT = 45_000
+MAX_COURSES_IN_CONTEXT = 4
+MAX_ASSIGNMENTS_IN_CONTEXT = 5
+MAX_PROJECTS_IN_CONTEXT = 3
+MAX_TASKS_IN_CONTEXT = 8
+MAX_FILES_IN_CONTEXT = 4
+MAX_PROJECT_SIGNALS = 8
+
+FILE_CACHE_MAX_ITEMS = 256
+FILE_READ_LIMIT = 260_000
+RAW_FILE_TAIL_BUDGET = 1_200
+EXCERPT_DEFAULT_MAX_CHARS = 900
+
+BUDGET_FACTS = 10
+BUDGET_ENTITIES = 20
+BUDGET_EXCERPTS = 30
+BUDGET_RAW_TEXT = 40
+
+_CHAT_ROUTE_STUDY_GENERAL = "study_general"
+_CHAT_ROUTE_COURSE = "course"
+_CHAT_ROUTE_ASSIGNMENT = "assignment"
+_CHAT_ROUTE_SCHEDULE_DEADLINE = "schedule_deadline"
+_CHAT_ROUTE_PROJECT = "project"
+_CHAT_ROUTE_PLANNING_PRODUCTIVITY = "planning_productivity"
+
+CHAT_ROUTE_LABELS: dict[str, str] = {
+    _CHAT_ROUTE_STUDY_GENERAL: "Учеба в целом",
+    _CHAT_ROUTE_COURSE: "Конкретный курс",
+    _CHAT_ROUTE_ASSIGNMENT: "Конкретное задание",
+    _CHAT_ROUTE_SCHEDULE_DEADLINE: "Расписание/дедлайны",
+    _CHAT_ROUTE_PROJECT: "Проект",
+    _CHAT_ROUTE_PLANNING_PRODUCTIVITY: "Планирование/продуктивность",
+}
+
+_WORD_RE = re.compile(r"[A-Za-zА-Яа-яЁё0-9_]{2,}")
+
+_STOPWORDS = {
+    "и", "или", "но", "а", "да", "нет", "что", "как", "это", "эта", "этот", "эти",
+    "меня", "мне", "мы", "вы", "они", "она", "он", "его", "ее", "их", "у", "в", "во",
+    "на", "по", "к", "ко", "с", "со", "из", "за", "для", "до", "от", "под", "над", "без",
+    "же", "ли", "бы", "ну", "давай", "нужно", "надо", "can", "could", "would", "should",
+    "the", "a", "an", "to", "for", "and", "or", "in", "on", "at", "is", "are", "be",
+    "with", "of", "from", "about", "help", "please",
+}
+
+_FILE_TEXT_CACHE: OrderedDict[tuple[str, int, float], str] = OrderedDict()
 
 
-class ContextBuilder:
+@dataclass
+class ChatHistoryMessage:
+    role: str
+    content: str
+
+
+@dataclass
+class ChatContextPackage:
+    route: str
+    route_label: str
+    route_reason: str
+    keywords: list[str]
+    context_text: str
+    recent_messages: list[ChatHistoryMessage]
+    older_history_summary: str
+
+
+@dataclass
+class _ContextBlock:
+    priority: int
+    order: int
+    title: str
+    text: str
+
+
+@dataclass
+class DerivedFacts:
+    overdue: list[str]
+    upcoming: list[str]
+    today_events: list[str]
+    conflicts: list[str]
+    assignee_load: list[str]
+    blockers: list[str]
+
+
+class PriorityContextAssembler:
     def __init__(self, max_chars: int):
         self.max_chars = max_chars
-        self._chunks: list[str] = []
-        self._size = 0
-        self._truncated = False
+        self._counter = 0
+        self._blocks: list[_ContextBlock] = []
 
-    def add(self, text: str):
+    def add(self, title: str, text: str, priority: int) -> None:
         if not text:
             return
-        if self._size >= self.max_chars:
-            self._truncated = True
-            return
-        remaining = self.max_chars - self._size
-        if len(text) <= remaining:
-            self._chunks.append(text)
-            self._size += len(text)
-            return
+        self._counter += 1
+        self._blocks.append(_ContextBlock(priority=priority, order=self._counter, title=title, text=text.strip()))
 
-        reserve = 88
-        clipped = text[: max(0, remaining - reserve)].rstrip()
-        tail = "\n...[контекст усечен из-за большого объема]\n"
-        self._chunks.append(clipped + tail)
-        self._size = self.max_chars
-        self._truncated = True
+    def build(self, preface: str = "") -> str:
+        chunks: list[str] = []
+        used = 0
 
-    def build(self) -> str:
-        return "".join(self._chunks)
+        if preface:
+            clipped_preface = _clip(preface.strip(), self.max_chars)
+            chunks.append(clipped_preface + "\n\n")
+            used = len(chunks[0])
 
-    @property
-    def truncated(self) -> bool:
-        return self._truncated
+        for block in sorted(self._blocks, key=lambda item: (item.priority, item.order)):
+            if used >= self.max_chars:
+                break
+
+            section = f"### {block.title}\n{block.text}\n\n"
+            remaining = self.max_chars - used
+
+            if len(section) <= remaining:
+                chunks.append(section)
+                used += len(section)
+                continue
+
+            clipped = _clip(section, remaining)
+            if clipped:
+                chunks.append(clipped)
+            break
+
+        return "".join(chunks).strip()
 
 
 def _clip(text: str | None, max_chars: int) -> str:
-    if not text:
+    if not text or max_chars <= 0:
         return ""
     value = text.strip()
     if len(value) <= max_chars:
         return value
-    return f"{value[:max_chars].rstrip()}\n...[усечено, показано {max_chars} символов]"
+    marker = "\n...[контекст усечен]"
+    reserve = len(marker) + 4
+    limit = max(0, max_chars - reserve)
+    return f"{value[:limit].rstrip()}{marker}"
 
 
 def _fmt_dt(value: datetime | None) -> str:
@@ -101,36 +188,67 @@ def _fmt_day_index(day_index: int) -> str:
 
 
 def _fmt_assignment_status(status: str | None) -> str:
-    labels = {
-        "pending": "ожидает",
-        "progress": "в процессе",
-        "done": "выполнено",
-        "overdue": "просрочено",
-    }
+    labels = {"pending": "ожидает", "progress": "в процессе", "done": "выполнено", "overdue": "просрочено"}
     return labels.get((status or "").strip(), status or "не указан")
 
 
 def _fmt_task_status(status: str | None) -> str:
-    labels = {
-        "todo": "к выполнению",
-        "in_progress": "в работе",
-        "done": "выполнено",
-    }
+    labels = {"todo": "к выполнению", "in_progress": "в работе", "done": "выполнено"}
     return labels.get((status or "").strip(), status or "не указан")
 
 
-def _read_zip_xml_text(path: str, member: str, max_chars: int) -> str:
+def _normalize_whitespace(text: str) -> str:
+    return re.sub(r"[ \t]+", " ", text).strip()
+
+
+def _to_text(value: object) -> str:
+    if value is None:
+        return ""
+    return str(value)
+
+
+def extract_keywords(text: str, max_keywords: int = 16) -> list[str]:
+    lowered = _to_text(text).casefold()
+    if not lowered:
+        return []
+
+    counts: Counter[str] = Counter()
+    for token in _WORD_RE.findall(lowered):
+        normalized = token.strip("_")
+        if len(normalized) < 3 or normalized in _STOPWORDS:
+            continue
+        counts[normalized] += 1
+
+    ordered = sorted(counts.items(), key=lambda item: (-item[1], -len(item[0]), item[0]))
+    return [word for word, _ in ordered[:max_keywords]]
+
+
+def _text_match_score(text: str, keywords: list[str]) -> int:
+    value = _to_text(text).casefold()
+    if not value or not keywords:
+        return 0
+    return sum(1 for keyword in keywords if keyword in value)
+
+
+def _match_name_in_text(name: str, text: str) -> bool:
+    left = _to_text(name).casefold().strip()
+    right = _to_text(text).casefold()
+    return bool(left and right and left in right)
+
+def _read_zip_xml_text(path: str, member: str) -> str:
     with zipfile.ZipFile(path) as archive:
         with archive.open(member) as src:
             root = ET.parse(src).getroot()
+
     parts: list[str] = []
     for node in root.iter():
-        if node.text and node.text.strip():
-            parts.append(node.text.strip())
-    return _clip(" ".join(parts), max_chars)
+        value = _to_text(node.text).strip()
+        if value:
+            parts.append(value)
+    return "\n".join(parts)
 
 
-def extract_file_text(file_path: str | None, max_chars: int) -> tuple[str, str]:
+def _read_file_text_raw(file_path: str) -> tuple[str, str]:
     if not file_path:
         return "", "файл не прикреплен"
     if not os.path.exists(file_path):
@@ -140,23 +258,151 @@ def extract_file_text(file_path: str | None, max_chars: int) -> tuple[str, str]:
     try:
         if ext in TEXT_EXTENSIONS:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as handle:
-                return _clip(handle.read(max_chars + 200), max_chars), "ok"
+                return handle.read(FILE_READ_LIMIT), "ok"
         if ext == ".odt":
-            return _read_zip_xml_text(file_path, "content.xml", max_chars), "ok"
+            return _read_zip_xml_text(file_path, "content.xml")[:FILE_READ_LIMIT], "ok"
         if ext == ".docx":
-            return _read_zip_xml_text(file_path, "word/document.xml", max_chars), "ok"
-        return "", f"тип файла {ext or 'неизвестный'} не поддерживается для извлечения текста"
-    except Exception as exc:
+            return _read_zip_xml_text(file_path, "word/document.xml")[:FILE_READ_LIMIT], "ok"
+        return "", f"тип файла {ext or 'неизвестный'} не поддерживается"
+    except Exception as exc:  # pragma: no cover
         return "", f"не удалось извлечь текст ({exc.__class__.__name__})"
+
+
+def _get_file_cache_key(file_path: str) -> tuple[str, int, float] | None:
+    if not file_path or not os.path.exists(file_path):
+        return None
+    stat = os.stat(file_path)
+    return (os.path.abspath(file_path), int(stat.st_size), float(stat.st_mtime))
+
+
+def _get_cached_file_text(file_path: str | None) -> tuple[str, str]:
+    if not file_path:
+        return "", "файл не прикреплен"
+
+    key = _get_file_cache_key(file_path)
+    if key is None:
+        return "", "файл отсутствует на диске"
+
+    cached = _FILE_TEXT_CACHE.get(key)
+    if cached is not None:
+        _FILE_TEXT_CACHE.move_to_end(key)
+        return cached, "ok"
+
+    text, state = _read_file_text_raw(file_path)
+    if not text:
+        return "", state
+
+    _FILE_TEXT_CACHE[key] = text
+    _FILE_TEXT_CACHE.move_to_end(key)
+
+    while len(_FILE_TEXT_CACHE) > FILE_CACHE_MAX_ITEMS:
+        _FILE_TEXT_CACHE.popitem(last=False)
+
+    return text, "ok"
+
+
+def _slice_windows_around_matches(
+    text: str,
+    keywords: list[str],
+    *,
+    window_chars: int,
+    max_windows: int,
+) -> list[tuple[int, int]]:
+    if not keywords or not text:
+        return []
+
+    lowered = text.casefold()
+    positions: list[int] = []
+
+    for keyword in keywords:
+        start = 0
+        hits = 0
+        while hits < 2:
+            idx = lowered.find(keyword, start)
+            if idx < 0:
+                break
+            positions.append(idx)
+            hits += 1
+            start = idx + len(keyword)
+
+    if not positions:
+        return []
+
+    half = max(120, window_chars // 2)
+    raw_windows: list[tuple[int, int]] = []
+    for idx in sorted(positions):
+        raw_windows.append((max(0, idx - half), min(len(text), idx + half)))
+
+    merged: list[tuple[int, int]] = []
+    for left, right in raw_windows:
+        if not merged:
+            merged.append((left, right))
+            continue
+        prev_left, prev_right = merged[-1]
+        if left <= prev_right + 80:
+            merged[-1] = (prev_left, max(prev_right, right))
+        else:
+            merged.append((left, right))
+
+    return merged[:max_windows]
+
+
+def select_keyword_excerpt(
+    text: str,
+    keywords: list[str],
+    *,
+    max_chars: int = EXCERPT_DEFAULT_MAX_CHARS,
+    window_chars: int = 420,
+    max_windows: int = 3,
+) -> str:
+    clean = _to_text(text)
+    if not clean:
+        return ""
+
+    if len(clean) <= max_chars:
+        return clean.strip()
+
+    windows = _slice_windows_around_matches(clean, keywords, window_chars=window_chars, max_windows=max_windows)
+    if not windows:
+        return _clip(clean, max_chars)
+
+    chunks: list[str] = []
+    for index, (left, right) in enumerate(windows):
+        excerpt = clean[left:right].strip()
+        if not excerpt:
+            continue
+        prefix = "..." if left > 0 else ""
+        suffix = "..." if right < len(clean) else ""
+        if index > 0:
+            chunks.append("\n---\n")
+        chunks.append(f"{prefix}{excerpt}{suffix}")
+
+    return _clip("".join(chunks), max_chars)
+
+
+def extract_file_excerpt(
+    file_path: str | None,
+    keywords: list[str],
+    *,
+    max_chars: int = EXCERPT_DEFAULT_MAX_CHARS,
+) -> tuple[str, str]:
+    raw_text, state = _get_cached_file_text(file_path)
+    if not raw_text:
+        return "", state
+    return select_keyword_excerpt(raw_text, keywords, max_chars=max_chars), "ok"
+
+
+def extract_file_text(file_path: str | None, max_chars: int) -> tuple[str, str]:
+    raw_text, state = _get_cached_file_text(file_path)
+    if not raw_text:
+        return "", state
+    return _clip(raw_text, max_chars), "ok"
 
 
 def _course_query(db: Session, user_id: int):
     return (
         db.query(models.Course)
-        .options(
-            selectinload(models.Course.materials),
-            selectinload(models.Course.assignments),
-        )
+        .options(selectinload(models.Course.materials), selectinload(models.Course.assignments))
         .filter(models.Course.user_id == user_id)
         .order_by(models.Course.id.asc())
     )
@@ -186,48 +432,107 @@ def _project_query_by_id_for_user(db: Session, project_id: int, user_id: int):
     return _project_query_for_user(db, user_id).filter(models.Project.id == project_id)
 
 
+def _load_workspace_data(
+    db: Session,
+    user_id: int,
+) -> tuple[list[models.Course], list[models.ScheduleEvent], list[models.Project]]:
+    courses = _course_query(db, user_id).all()
+    schedule_events = (
+        db.query(models.ScheduleEvent)
+        .filter(models.ScheduleEvent.user_id == user_id)
+        .order_by(models.ScheduleEvent.day_index.asc(), models.ScheduleEvent.start_minute.asc())
+        .all()
+    )
+    projects = _project_query_for_user(db, user_id).all()
+    return courses, schedule_events, projects
+
+def _nearest_course_deadline(course: models.Course) -> datetime | None:
+    now = datetime.now()
+    candidates = [
+        assignment.deadline_dt
+        for assignment in (course.assignments or [])
+        if assignment.deadline_dt and assignment.status != "done" and assignment.deadline_dt >= now
+    ]
+    return min(candidates) if candidates else None
+
+
+def _nearest_project_deadline(project: models.Project) -> datetime | None:
+    now = datetime.now()
+    candidates = [
+        task.due_date
+        for task in (project.tasks or [])
+        if task.due_date and task.status != "done" and task.due_date >= now
+    ]
+    return min(candidates) if candidates else None
+
+
 def _calc_workspace_derived(
     courses: list[models.Course],
     schedule_events: list[models.ScheduleEvent],
     projects: list[models.Project],
-) -> dict[str, list[str]]:
+) -> DerivedFacts:
     now = datetime.now()
+
     overdue: list[tuple[datetime, str]] = []
     upcoming: list[tuple[datetime, str]] = []
     conflicts_map: defaultdict[str, list[str]] = defaultdict(list)
     assignee_load: defaultdict[str, int] = defaultdict(int)
+    blockers: list[str] = []
 
     for course in courses:
         for assignment in course.assignments or []:
             if not assignment.deadline_dt:
                 continue
-            label = f"Курс «{course.name}»: «{assignment.title}» ({_fmt_assignment_status(assignment.status)}) до {_fmt_dt(assignment.deadline_dt)}"
+            label = (
+                f"Курс «{course.name}»: «{assignment.title}» "
+                f"({_fmt_assignment_status(assignment.status)}), до {_fmt_dt(assignment.deadline_dt)}"
+            )
+
             if assignment.status != "done" and assignment.deadline_dt < now:
                 overdue.append((assignment.deadline_dt, label))
+
             if assignment.status != "done" and assignment.deadline_dt >= now:
                 upcoming.append((assignment.deadline_dt, label))
-            if assignment.status != "done":
                 conflicts_map[assignment.deadline_dt.date().isoformat()].append(label)
+
+            if assignment.status != "done" and not (assignment.description or "").strip() and not assignment.file_path:
+                blockers.append(
+                    f"Курс «{course.name}», задание «{assignment.title}»: мало входных данных (нет описания и файла)."
+                )
 
     for project in projects:
         for task in project.tasks or []:
             assignee_name = task.assignee.name if task.assignee else "Без исполнителя"
+
             if task.status != "done":
                 assignee_load[assignee_name] += 1
+
+            if task.status != "done" and not task.assignee:
+                blockers.append(f"Проект «{project.name}», задача «{task.title}»: нет исполнителя.")
+
+            if task.status == "in_progress" and not (task.description or "").strip():
+                blockers.append(f"Проект «{project.name}», задача «{task.title}»: в работе без описания.")
+
             if not task.due_date:
                 continue
-            label = f"Проект «{project.name}»: «{task.title}» ({_fmt_task_status(task.status)}, {assignee_name}) до {_fmt_dt(task.due_date)}"
+
+            label = (
+                f"Проект «{project.name}»: «{task.title}» "
+                f"({_fmt_task_status(task.status)}, {assignee_name}), до {_fmt_dt(task.due_date)}"
+            )
+
             if task.status != "done" and task.due_date < now:
                 overdue.append((task.due_date, label))
+
             if task.status != "done" and task.due_date >= now:
                 upcoming.append((task.due_date, label))
-            if task.status != "done":
                 conflicts_map[task.due_date.date().isoformat()].append(label)
 
     today_events: list[str] = []
-    current_weekday = now.weekday()
-    today = [event for event in schedule_events if event.day_index == current_weekday]
-    for event in sorted(today, key=lambda item: item.start_minute):
+    today_index = now.weekday()
+    today_schedule = [item for item in schedule_events if item.day_index == today_index]
+
+    for event in sorted(today_schedule, key=lambda item: item.start_minute):
         start_h = event.start_minute // 60
         start_m = event.start_minute % 60
         end_total = event.start_minute + event.duration_minutes
@@ -237,21 +542,23 @@ def _calc_workspace_derived(
             f"{start_h:02d}:{start_m:02d}–{end_h:02d}:{end_m:02d} — {event.title} ({event.location or 'локация не указана'})"
         )
 
-    sorted_overdue = [item[1] for item in sorted(overdue, key=lambda x: x[0])[:14]]
-    sorted_upcoming = [item[1] for item in sorted(upcoming, key=lambda x: x[0])[:18]]
-    conflicts = []
+    sorted_overdue = [item[1] for item in sorted(overdue, key=lambda row: row[0])[:16]]
+    sorted_upcoming = [item[1] for item in sorted(upcoming, key=lambda row: row[0])[:20]]
+
+    conflicts: list[str] = []
     for date_key, labels in sorted(conflicts_map.items()):
         if len(labels) < 2:
             continue
         conflicts.append(f"{date_key}: {len(labels)} пересечения")
         for label in labels[:4]:
-            conflicts.append(f"  - {label}")
+            conflicts.append(f"- {label}")
 
-    load_lines = []
+    load_lines: list[str] = []
     if assignee_load:
-        ordered = sorted(assignee_load.items(), key=lambda item: item[1], reverse=True)
+        ordered = sorted(assignee_load.items(), key=lambda row: row[1], reverse=True)
         for name, count in ordered:
             load_lines.append(f"{name}: {count} открытых задач")
+
         if len(ordered) >= 2:
             max_count = ordered[0][1]
             min_count = ordered[-1][1]
@@ -260,284 +567,746 @@ def _calc_workspace_derived(
                     f"Признак дисбаланса: у «{ordered[0][0]}» на {max_count - min_count} задач больше, чем у «{ordered[-1][0]}»."
                 )
 
-    return {
-        "overdue": sorted_overdue,
-        "upcoming": sorted_upcoming,
-        "today_events": today_events,
-        "conflicts": conflicts,
-        "assignee_load": load_lines,
-    }
+    return DerivedFacts(
+        overdue=sorted_overdue,
+        upcoming=sorted_upcoming,
+        today_events=today_events,
+        conflicts=conflicts,
+        assignee_load=load_lines,
+        blockers=blockers[:14],
+    )
 
 
-def _render_course_details(course: models.Course, include_material_text: bool, include_assignment_file_text: bool) -> str:
+def _render_derived_block(derived: DerivedFacts) -> str:
+    lines: list[str] = []
+
+    lines.append("Просрочки:")
+    lines.extend([f"- {item}" for item in derived.overdue] or ["- Нет."])
+
+    lines.append("\nБлижайшие дедлайны:")
+    lines.extend([f"- {item}" for item in derived.upcoming[:12]] or ["- Нет."])
+
+    lines.append("\nРасписание на сегодня:")
+    lines.extend([f"- {item}" for item in derived.today_events] or ["- На сегодня занятий нет."])
+
+    lines.append("\nКонфликты сроков:")
+    lines.extend([f"- {item}" for item in derived.conflicts[:10]] or ["- Явных пересечений нет."])
+
+    lines.append("\nНагрузка по исполнителям:")
+    lines.extend([f"- {item}" for item in derived.assignee_load[:10]] or ["- Недостаточно данных."])
+
+    lines.append("\nБлокеры и узкие места:")
+    lines.extend([f"- {item}" for item in derived.blockers[:8]] or ["- Явных блокеров не найдено."])
+
+    return "\n".join(lines)
+
+
+def _render_workspace_snapshot(
+    courses: list[models.Course],
+    schedule_events: list[models.ScheduleEvent],
+    projects: list[models.Project],
+) -> str:
+    now = datetime.now()
+
+    open_assignments = sum(
+        1 for course in courses for assignment in (course.assignments or []) if assignment.status != "done"
+    )
+    open_tasks = sum(1 for project in projects for task in (project.tasks or []) if task.status != "done")
+
     lines = [
-        f"- Курс: «{course.name}»",
-        f"  Преподаватель: {course.teacher or '—'}; семестр: {course.semester or '—'}; прогресс: {course.progress:.0f}%",
-        f"  Материалы: {(len(course.materials or []))}; задания: {(len(course.assignments or []))}",
+        f"Текущее время анализа: {_fmt_dt(now)}",
+        f"Курсов: {len(courses)}, открытых учебных заданий: {open_assignments}",
+        f"Событий расписания: {len(schedule_events)}",
+        f"Проектов: {len(projects)}, открытых проектных задач: {open_tasks}",
     ]
 
-    materials = course.materials or []
-    if materials:
-        lines.append("  Материалы курса:")
-        for material in materials:
-            lines.append(
-                f"    - {material.name} ({material.mime_type or 'тип не указан'}, {material.size_bytes} байт)"
-            )
-            if include_material_text:
-                text, state = extract_file_text(material.file_path, COURSE_FILE_TEXT_LIMIT)
-                if text:
-                    lines.append(f"      Текст материала:\n{_clip(text, COURSE_FILE_TEXT_LIMIT)}")
-                else:
-                    lines.append(f"      Текст материала: {state}.")
-    else:
-        lines.append("  Материалы курса: нет.")
+    near_courses = sorted(
+        [course for course in courses if _nearest_course_deadline(course)],
+        key=lambda item: _nearest_course_deadline(item) or datetime.max,
+    )[:3]
+    if near_courses:
+        lines.append("\nКурсы с ближайшими дедлайнами:")
+        lines.extend(f"- {course.name}: до {_fmt_dt(_nearest_course_deadline(course))}" for course in near_courses)
 
+    near_projects = sorted(
+        [project for project in projects if _nearest_project_deadline(project)],
+        key=lambda item: _nearest_project_deadline(item) or datetime.max,
+    )[:3]
+    if near_projects:
+        lines.append("\nПроекты с ближайшими дедлайнами:")
+        lines.extend(f"- {project.name}: до {_fmt_dt(_nearest_project_deadline(project))}" for project in near_projects)
+
+    return "\n".join(lines)
+
+
+def _render_course_summary(course: models.Course) -> str:
     assignments = course.assignments or []
-    if assignments:
-        lines.append("  Задания курса:")
-        for assignment in assignments:
-            lines.append(
-                f"    - «{assignment.title}»; статус: {_fmt_assignment_status(assignment.status)}; дедлайн: {assignment.deadline or _fmt_dt(assignment.deadline_dt)}"
+    pending = [item for item in assignments if item.status != "done"]
+    overdue = [item for item in pending if item.deadline_dt and item.deadline_dt < datetime.now()]
+
+    lines = [
+        f"Курс: «{course.name}»",
+        f"Преподаватель: {course.teacher or '—'}; семестр: {course.semester or '—'}; прогресс: {course.progress:.0f}%",
+        f"Материалов: {len(course.materials or [])}; заданий: {len(assignments)}; открытых: {len(pending)}; просроченных: {len(overdue)}",
+    ]
+
+    nearest_dt = _nearest_course_deadline(course)
+    if nearest_dt:
+        lines.append(f"Ближайший дедлайн: {_fmt_dt(nearest_dt)}")
+
+    return "\n".join(lines)
+
+
+def _render_assignment_summary(assignment: models.Assignment, course: models.Course | None) -> str:
+    lines = [
+        f"Задание: «{assignment.title}»",
+        f"Курс: {course.name if course else '—'}",
+        f"Статус: {_fmt_assignment_status(assignment.status)}",
+        f"Дедлайн: {assignment.deadline or _fmt_dt(assignment.deadline_dt)}",
+        f"Описание: {_clip(assignment.description or '—', 800)}",
+    ]
+    if assignment.file_name:
+        lines.append(f"Файл задания: {assignment.file_name}")
+    return "\n".join(lines)
+
+
+def _render_project_summary(project: models.Project) -> str:
+    tasks = project.tasks or []
+    open_tasks = [item for item in tasks if item.status != "done"]
+    overdue_tasks = [item for item in open_tasks if item.due_date and item.due_date < datetime.now()]
+
+    lines = [
+        f"Проект: «{project.name}»",
+        f"Описание: {_clip(project.description or '—', 900)}",
+        f"Участников: {len(project.members or [])}; задач: {len(tasks)}; открытых: {len(open_tasks)}; просроченных: {len(overdue_tasks)}",
+        f"Файлов: {len(project.files or [])}; сообщений: {len(project.messages or [])}",
+    ]
+
+    nearest = _nearest_project_deadline(project)
+    if nearest:
+        lines.append(f"Ближайший дедлайн по задаче: {_fmt_dt(nearest)}")
+    if project.owner:
+        lines.append(f"Владелец: {project.owner.name} ({project.owner.email or 'без email'})")
+
+    return "\n".join(lines)
+
+
+def _render_schedule_snapshot(schedule_events: list[models.ScheduleEvent]) -> str:
+    if not schedule_events:
+        return "Расписание пустое."
+
+    lines: list[str] = []
+    for event in schedule_events[:14]:
+        start_h = event.start_minute // 60
+        start_m = event.start_minute % 60
+        end_total = event.start_minute + event.duration_minutes
+        end_h = end_total // 60
+        end_m = end_total % 60
+        lines.append(
+            f"- {_fmt_day_index(event.day_index)} {start_h:02d}:{start_m:02d}-{end_h:02d}:{end_m:02d} — {event.title} ({event.location or 'локация не указана'})"
+        )
+
+    return "\n".join(lines)
+
+def _select_relevant_courses(
+    courses: list[models.Course],
+    keywords: list[str],
+    *,
+    max_items: int,
+) -> list[models.Course]:
+    if not courses:
+        return []
+
+    ranked: list[tuple[int, datetime, models.Course]] = []
+    for course in courses:
+        score = _text_match_score(course.name, keywords) * 3 + _text_match_score(course.teacher, keywords)
+
+        for assignment in course.assignments or []:
+            score += _text_match_score(assignment.title, keywords) * 2
+            score += _text_match_score(assignment.description, keywords)
+
+        ranked.append((score, _nearest_course_deadline(course) or datetime.max, course))
+
+    ranked.sort(key=lambda row: (-row[0], row[1], row[2].id))
+    selected = [row[2] for row in ranked if row[0] > 0][:max_items]
+    if selected:
+        return selected
+
+    fallback = sorted(courses, key=lambda item: _nearest_course_deadline(item) or datetime.max)
+    return fallback[:max_items]
+
+
+def _select_relevant_assignments(
+    courses: list[models.Course],
+    keywords: list[str],
+    *,
+    max_items: int,
+) -> list[tuple[models.Course, models.Assignment]]:
+    rows: list[tuple[int, datetime, models.Course, models.Assignment]] = []
+
+    for course in courses:
+        for assignment in course.assignments or []:
+            score = (
+                _text_match_score(assignment.title, keywords) * 3
+                + _text_match_score(assignment.description, keywords)
+                + _text_match_score(course.name, keywords)
             )
-            lines.append(f"      Описание: {_clip(assignment.description or '—', 900)}")
-            if assignment.file_name:
-                lines.append(f"      Файл задания: {assignment.file_name}")
-            if include_assignment_file_text and assignment.file_path:
-                text, state = extract_file_text(assignment.file_path, ASSIGNMENT_FILE_TEXT_LIMIT)
-                if text:
-                    lines.append(f"      Текст файла задания:\n{_clip(text, ASSIGNMENT_FILE_TEXT_LIMIT)}")
-                else:
-                    lines.append(f"      Текст файла задания: {state}.")
-    else:
-        lines.append("  Задания курса: нет.")
-    return "\n".join(lines) + "\n"
+            rows.append((score, assignment.deadline_dt or datetime.max, course, assignment))
+
+    rows.sort(key=lambda row: (-row[0], row[1], row[3].id))
+
+    selected = [(row[2], row[3]) for row in rows if row[0] > 0][:max_items]
+    if selected:
+        return selected
+
+    fallback = [(row[2], row[3]) for row in rows if row[3].status != "done"]
+    if fallback:
+        return fallback[:max_items]
+
+    return [(row[2], row[3]) for row in rows[:max_items]]
+
+
+def _select_relevant_projects(
+    projects: list[models.Project],
+    keywords: list[str],
+    *,
+    max_items: int,
+) -> list[models.Project]:
+    if not projects:
+        return []
+
+    ranked: list[tuple[int, datetime, models.Project]] = []
+    for project in projects:
+        score = _text_match_score(project.name, keywords) * 3 + _text_match_score(project.description, keywords)
+
+        for task in project.tasks or []:
+            score += _text_match_score(task.title, keywords) * 2
+            score += _text_match_score(task.description, keywords)
+
+        for file_item in project.files or []:
+            score += _text_match_score(file_item.name, keywords)
+
+        ranked.append((score, _nearest_project_deadline(project) or datetime.max, project))
+
+    ranked.sort(key=lambda row: (-row[0], row[1], row[2].id))
+    selected = [row[2] for row in ranked if row[0] > 0][:max_items]
+    if selected:
+        return selected
+
+    fallback = sorted(projects, key=lambda item: _nearest_project_deadline(item) or datetime.max)
+    return fallback[:max_items]
+
+
+def _render_task_risks(project: models.Project, *, limit: int = 8) -> str:
+    now = datetime.now()
+    lines: list[str] = []
+
+    for task in sorted(project.tasks or [], key=lambda item: item.due_date or datetime.max):
+        if task.status == "done":
+            continue
+
+        assignee = task.assignee.name if task.assignee else "Без исполнителя"
+
+        if task.due_date and task.due_date < now:
+            lines.append(f"- Просрочено: «{task.title}», до {_fmt_dt(task.due_date)}, исполнитель: {assignee}.")
+        elif not task.assignee:
+            lines.append(f"- Риск: «{task.title}» без исполнителя.")
+        elif not task.due_date:
+            lines.append(f"- Риск: «{task.title}» без дедлайна (исполнитель: {assignee}).")
+
+    return "\n".join(lines[:limit]) if lines else "- Критичных рисков по задачам не найдено."
+
+
+def _collect_project_signals(project: models.Project, keywords: list[str]) -> str:
+    signals: list[tuple[datetime, str]] = []
+
+    for message in project.messages or []:
+        author = message.author.name if message.author else "Участник"
+        excerpt = select_keyword_excerpt(message.body, keywords, max_chars=260, window_chars=240, max_windows=1)
+        if excerpt:
+            signals.append((message.created_at or datetime.min, f"[{_fmt_dt(message.created_at)}] {author}: {excerpt}"))
+
+    for task in project.tasks or []:
+        for comment in task.comments or []:
+            author = comment.author.name if comment.author else "Участник"
+            excerpt = select_keyword_excerpt(comment.body, keywords, max_chars=240, window_chars=220, max_windows=1)
+            if excerpt:
+                signals.append(
+                    (
+                        comment.created_at or datetime.min,
+                        f"[{_fmt_dt(comment.created_at)}] Комментарий к «{task.title}», {author}: {excerpt}",
+                    )
+                )
+
+    if not signals:
+        return "- Сигналы по сообщениям/комментариям отсутствуют."
+
+    signals.sort(key=lambda row: row[0], reverse=True)
+    return "\n".join(f"- {line}" for _, line in signals[:MAX_PROJECT_SIGNALS])
+
+
+def _render_assignment_timeline(courses: list[models.Course], *, limit: int = 10) -> str:
+    rows: list[tuple[datetime, str]] = []
+
+    for course in courses:
+        for assignment in course.assignments or []:
+            if assignment.status == "done" or not assignment.deadline_dt:
+                continue
+            rows.append(
+                (
+                    assignment.deadline_dt,
+                    f"- Курс «{course.name}»: «{assignment.title}» до {_fmt_dt(assignment.deadline_dt)} ({_fmt_assignment_status(assignment.status)})",
+                )
+            )
+
+    if not rows:
+        return "- Нет открытых учебных дедлайнов с датой."
+
+    rows.sort(key=lambda row: row[0])
+    return "\n".join(row[1] for row in rows[:limit])
+
+
+def _render_project_timeline(projects: list[models.Project], *, limit: int = 10) -> str:
+    rows: list[tuple[datetime, str]] = []
+
+    for project in projects:
+        for task in project.tasks or []:
+            if task.status == "done" or not task.due_date:
+                continue
+            assignee = task.assignee.name if task.assignee else "без исполнителя"
+            rows.append(
+                (
+                    task.due_date,
+                    f"- Проект «{project.name}»: «{task.title}» до {_fmt_dt(task.due_date)} ({_fmt_task_status(task.status)}, {assignee})",
+                )
+            )
+
+    if not rows:
+        return "- Нет открытых проектных дедлайнов с датой."
+
+    rows.sort(key=lambda row: row[0])
+    return "\n".join(row[1] for row in rows[:limit])
+
+
+def _course_material_excerpts(course: models.Course, keywords: list[str], *, max_items: int = 2) -> str:
+    lines: list[str] = []
+
+    for material in (course.materials or [])[: max_items * 2]:
+        excerpt, state = extract_file_excerpt(material.file_path, keywords, max_chars=700)
+        if excerpt:
+            lines.append(f"- Материал «{material.name}»:\n{excerpt}")
+        else:
+            lines.append(f"- Материал «{material.name}»: {state}.")
+        if len(lines) >= max_items:
+            break
+
+    return "\n".join(lines) if lines else "- Релевантные фрагменты материалов не найдены."
+
+
+def _assignment_file_excerpt(assignment: models.Assignment, keywords: list[str]) -> str:
+    if not assignment.file_path:
+        return "- Файл задания не прикреплен."
+
+    excerpt, state = extract_file_excerpt(assignment.file_path, keywords, max_chars=850)
+    if not excerpt:
+        return f"- Файл задания: {state}."
+    return f"- Файл задания «{assignment.file_name or assignment.title}»:\n{excerpt}"
+
+
+def _project_file_excerpts(project: models.Project, keywords: list[str], *, max_items: int = 2) -> str:
+    if not project.files:
+        return "- В проекте нет файлов."
+
+    ranked = sorted(project.files, key=lambda file_item: (-_text_match_score(file_item.name, keywords), file_item.id))
+    lines: list[str] = []
+    for file_item in ranked:
+        excerpt, state = extract_file_excerpt(file_item.file_path, keywords, max_chars=700)
+        if excerpt:
+            lines.append(f"- Файл «{file_item.name}»:\n{excerpt}")
+        else:
+            lines.append(f"- Файл «{file_item.name}»: {state}.")
+        if len(lines) >= max_items:
+            break
+
+    return "\n".join(lines)
+
+
+def _render_course_assignment_briefs(course: models.Course, *, limit: int = 6) -> str:
+    now = datetime.now()
+    rows = [
+        (
+            assignment.deadline_dt or now,
+            f"- «{assignment.title}»: {_fmt_assignment_status(assignment.status)}, дедлайн {assignment.deadline or _fmt_dt(assignment.deadline_dt)}",
+        )
+        for assignment in (course.assignments or [])
+    ]
+
+    if not rows:
+        return "- В курсе нет заданий."
+
+    rows.sort(key=lambda row: row[0])
+    return "\n".join(item[1] for item in rows[:limit])
+
+
+def _render_project_task_briefs(project: models.Project, *, limit: int = 8) -> str:
+    now = datetime.now()
+    rows = []
+    for task in project.tasks or []:
+        assignee = task.assignee.name if task.assignee else "без исполнителя"
+        rows.append(
+            (
+                task.due_date or now,
+                f"- «{task.title}»: {_fmt_task_status(task.status)}, дедлайн {_fmt_dt(task.due_date)}, исполнитель {assignee}",
+            )
+        )
+
+    if not rows:
+        return "- В проекте нет задач."
+
+    rows.sort(key=lambda row: row[0])
+    return "\n".join(item[1] for item in rows[:limit])
+
+
+def _normalize_history_message(item: object) -> ChatHistoryMessage | None:
+    role = ""
+    content = ""
+
+    if hasattr(item, "role"):
+        role = _to_text(getattr(item, "role", "")).strip()
+        content = _to_text(getattr(item, "content", "")).strip()
+    elif isinstance(item, dict):
+        role = _to_text(item.get("role", "")).strip()
+        content = _to_text(item.get("content", "")).strip()
+
+    if not role or not content or role not in {"user", "assistant", "system"}:
+        return None
+
+    return ChatHistoryMessage(role=role, content=content)
+
+
+def summarize_old_history(messages: list[ChatHistoryMessage], max_chars: int = CHAT_OLD_HISTORY_SUMMARY_LIMIT) -> str:
+    if not messages:
+        return ""
+
+    user_points = [_clip(_normalize_whitespace(m.content), 180) for m in messages if m.role == "user"]
+    assistant_points = [_clip(_normalize_whitespace(m.content), 180) for m in messages if m.role == "assistant"]
+
+    lines: list[str] = [
+        "Сжатая история более раннего диалога:",
+        f"- Сообщений в сжатии: {len(messages)}",
+    ]
+
+    if user_points:
+        lines.append("- Ранние запросы пользователя:")
+        lines.extend(f"  - {item}" for item in user_points[-6:])
+
+    if assistant_points:
+        lines.append("- Ранние ответы ассистента:")
+        lines.extend(f"  - {item}" for item in assistant_points[-6:])
+
+    return _clip("\n".join(lines), max_chars)
+
+
+def split_chat_history(
+    messages: list[ChatHistoryMessage],
+    *,
+    keep_recent: int = CHAT_RECENT_MESSAGES_LIMIT,
+) -> tuple[list[ChatHistoryMessage], str]:
+    if len(messages) <= keep_recent:
+        return messages, ""
+    return messages[-keep_recent:], summarize_old_history(messages[:-keep_recent])
+
+
+def _last_user_message(messages: list[ChatHistoryMessage]) -> str:
+    for message in reversed(messages):
+        if message.role == "user":
+            return message.content
+    return messages[-1].content if messages else ""
+
+def classify_chat_intent(
+    last_message: str,
+    courses: list[models.Course],
+    projects: list[models.Project],
+) -> tuple[str, str]:
+    text = _to_text(last_message).casefold()
+    keywords = extract_keywords(last_message)
+
+    if not text:
+        return _CHAT_ROUTE_STUDY_GENERAL, "Пустой запрос, выбран общий учебный режим."
+
+    assignment_triggers = ["задани", "домаш", "лаба", "лаборат", "assignment", "hw"]
+    project_triggers = ["проект", "команд", "task", "таск", "спринт", "беклог"]
+    schedule_triggers = ["распис", "пара", "дедлайн", "срок", "когда", "today", "сегодня"]
+    planning_triggers = ["план", "приоритет", "продуктив", "успеть", "нагруз", "time", "тайм"]
+    course_triggers = ["курс", "предмет", "лекц", "семинар", "экзам", "зачет"]
+
+    for course in courses:
+        for assignment in course.assignments or []:
+            if _match_name_in_text(assignment.title, text):
+                return _CHAT_ROUTE_ASSIGNMENT, "Обнаружено упоминание конкретного задания."
+
+    for project in projects:
+        if _match_name_in_text(project.name, text):
+            return _CHAT_ROUTE_PROJECT, "Обнаружено упоминание конкретного проекта."
+        for task in project.tasks or []:
+            if _match_name_in_text(task.title, text):
+                return _CHAT_ROUTE_PROJECT, "Обнаружено упоминание задачи проекта."
+
+    if any(trigger in text for trigger in assignment_triggers):
+        return _CHAT_ROUTE_ASSIGNMENT, "Обнаружены признаки запроса по заданию."
+    if any(trigger in text for trigger in project_triggers):
+        return _CHAT_ROUTE_PROJECT, "Обнаружены признаки проектного запроса."
+    if any(trigger in text for trigger in schedule_triggers):
+        return _CHAT_ROUTE_SCHEDULE_DEADLINE, "Обнаружены признаки запроса про расписание/дедлайны."
+    if any(trigger in text for trigger in planning_triggers):
+        return _CHAT_ROUTE_PLANNING_PRODUCTIVITY, "Обнаружены признаки запроса по планированию."
+
+    for course in courses:
+        if _match_name_in_text(course.name, text):
+            return _CHAT_ROUTE_COURSE, "Обнаружено упоминание курса."
+
+    if any(trigger in text for trigger in course_triggers):
+        return _CHAT_ROUTE_COURSE, "Обнаружены признаки запроса про курс."
+    if keywords:
+        return _CHAT_ROUTE_STUDY_GENERAL, "Выбран общий режим по учебным ключевым словам."
+    return _CHAT_ROUTE_STUDY_GENERAL, "Выбран общий учебный режим по умолчанию."
+
+
+def build_workspace_summary_context(db: Session, user_id: int) -> str:
+    courses, schedule_events, projects = _load_workspace_data(db, user_id)
+    derived = _calc_workspace_derived(courses, schedule_events, projects)
+
+    assembler = PriorityContextAssembler(WORKSPACE_SUMMARY_CONTEXT_CHAR_LIMIT)
+    assembler.add("Stable snapshot", _render_workspace_snapshot(courses, schedule_events, projects), BUDGET_FACTS)
+    assembler.add("Derived facts", _render_derived_block(derived), BUDGET_FACTS)
+    assembler.add("Timeline по учебным дедлайнам", _render_assignment_timeline(courses), BUDGET_ENTITIES)
+    assembler.add("Timeline по проектным дедлайнам", _render_project_timeline(projects), BUDGET_ENTITIES)
+
+    if courses:
+        course_lines = [
+            _render_course_summary(course)
+            for course in _select_relevant_courses(courses, [], max_items=MAX_COURSES_IN_CONTEXT)
+        ]
+        assembler.add("Краткие сущности: курсы", "\n\n".join(course_lines), BUDGET_ENTITIES)
+
+    if projects:
+        project_lines = [
+            _render_project_summary(project)
+            for project in _select_relevant_projects(projects, [], max_items=MAX_PROJECTS_IN_CONTEXT)
+        ]
+        assembler.add("Краткие сущности: проекты", "\n\n".join(project_lines), BUDGET_ENTITIES)
+
+    return assembler.build("Контекст workspace для AI-сводки")
+
+
+def build_project_summary_context(db: Session, project_id: int, user_id: int) -> str | None:
+    project = _project_query_by_id_for_user(db, project_id, user_id).first()
+    if not project:
+        return None
+
+    derived = _calc_workspace_derived([], [], [project])
+    project_keywords = extract_keywords(f"{project.name} {project.description}")
+
+    assembler = PriorityContextAssembler(PROJECT_SUMMARY_CONTEXT_CHAR_LIMIT)
+    assembler.add("Stable snapshot проекта", _render_project_summary(project), BUDGET_FACTS)
+    assembler.add("Derived facts проекта", _render_derived_block(derived), BUDGET_FACTS)
+    assembler.add("Риски по задачам", _render_task_risks(project, limit=MAX_TASKS_IN_CONTEXT), BUDGET_FACTS)
+    assembler.add("Ключевые задачи", _render_project_task_briefs(project), BUDGET_ENTITIES)
+    assembler.add("Recent signals (сообщения и комментарии)", _collect_project_signals(project, project_keywords), BUDGET_ENTITIES)
+    assembler.add("File excerpts", _project_file_excerpts(project, project_keywords, max_items=MAX_FILES_IN_CONTEXT), BUDGET_EXCERPTS)
+
+    return assembler.build("Контекст проекта для AI-сводки")
 
 
 def build_course_plan_context(course: models.Course, extra_context: str) -> str:
-    builder = ContextBuilder(COURSE_CONTEXT_CHAR_LIMIT)
-    builder.add("Контекст курса для AI-плана:\n")
-    builder.add(_render_course_details(course, include_material_text=True, include_assignment_file_text=True))
+    keywords = extract_keywords(f"{course.name} {extra_context}")
+
+    assembler = PriorityContextAssembler(COURSE_PLAN_CONTEXT_CHAR_LIMIT)
+    assembler.add("Stable snapshot курса", _render_course_summary(course), BUDGET_FACTS)
+    assembler.add("Задания курса", _render_course_assignment_briefs(course), BUDGET_ENTITIES)
+
     if extra_context.strip():
-        builder.add(f"\nДополнительный контекст от пользователя:\n{_clip(extra_context, 4000)}\n")
-    return builder.build()
+        assembler.add("Дополнительный контекст пользователя", _clip(extra_context, 4_500), BUDGET_FACTS)
+
+    assembler.add("Excerpts из материалов курса", _course_material_excerpts(course, keywords, max_items=MAX_FILES_IN_CONTEXT), BUDGET_EXCERPTS)
+
+    assignment_file_lines: list[str] = []
+    for assignment in (course.assignments or [])[:MAX_ASSIGNMENTS_IN_CONTEXT]:
+        if assignment.file_path:
+            assignment_file_lines.append(f"- «{assignment.title}»\n{_assignment_file_excerpt(assignment, keywords)}")
+
+    if assignment_file_lines:
+        assembler.add("Excerpts из файлов заданий", "\n".join(assignment_file_lines), BUDGET_EXCERPTS)
+
+    if course.materials:
+        raw_lines: list[str] = []
+        for material in course.materials[:2]:
+            raw_text, state = extract_file_text(material.file_path, RAW_FILE_TAIL_BUDGET)
+            raw_lines.append(f"- {material.name}:\n{raw_text}" if raw_text else f"- {material.name}: {state}.")
+        assembler.add("Raw text fallback", "\n".join(raw_lines), BUDGET_RAW_TEXT)
+
+    return assembler.build("Контекст курса для AI-плана")
 
 
 def build_assignment_help_context(
     assignment: models.Assignment,
     course: models.Course | None,
+    question: str = "",
 ) -> str:
-    builder = ContextBuilder(ASSIGNMENT_CONTEXT_CHAR_LIMIT)
-    builder.add("Контекст для помощи по заданию:\n")
-    builder.add(f"Задание: «{assignment.title}»\n")
-    builder.add(f"Описание задания: {_clip(assignment.description or '—', 2500)}\n")
-    builder.add(f"Статус: {_fmt_assignment_status(assignment.status)}\n")
-    builder.add(f"Дедлайн: {assignment.deadline or _fmt_dt(assignment.deadline_dt)}\n")
-    if assignment.file_name:
-        builder.add(f"Прикрепленный файл задания: {assignment.file_name}\n")
-    text, state = extract_file_text(assignment.file_path, ASSIGNMENT_FILE_TEXT_LIMIT)
-    if text:
-        builder.add(f"Текст прикрепленного файла задания:\n{text}\n")
+    base_text = f"{assignment.title} {assignment.description or ''} {question}"
+    if course:
+        base_text += f" {course.name}"
+    keywords = extract_keywords(base_text)
+
+    assembler = PriorityContextAssembler(ASSIGNMENT_HELP_CONTEXT_CHAR_LIMIT)
+    assembler.add("Stable snapshot задания", _render_assignment_summary(assignment, course), BUDGET_FACTS)
+
+    if question.strip():
+        assembler.add("Вопрос пользователя", _clip(question, 2_200), BUDGET_FACTS)
     else:
-        builder.add(f"Текст прикрепленного файла задания: {state}.\n")
+        assembler.add(
+            "Режим помощи",
+            "Пользователь не задал явный вопрос: нужна полезная авто-подсказка по старту, шагам и рискам.",
+            BUDGET_FACTS,
+        )
+
+    assembler.add("Excerpt из файла задания", _assignment_file_excerpt(assignment, keywords), BUDGET_EXCERPTS)
 
     if course:
-        builder.add("\nСвязанный курс:\n")
-        builder.add(_render_course_details(course, include_material_text=True, include_assignment_file_text=True))
-        other_assignments = [
-            item for item in (course.assignments or []) if item.id != assignment.id
-        ]
-        if other_assignments:
-            builder.add("Другие задания этого курса (для нагрузки и приоритетов):\n")
-            for item in other_assignments:
-                builder.add(
-                    f"- «{item.title}»; статус: {_fmt_assignment_status(item.status)}; дедлайн: {item.deadline or _fmt_dt(item.deadline_dt)}\n"
-                )
-    return builder.build()
+        assembler.add("Курс задания", _render_course_summary(course), BUDGET_ENTITIES)
 
-
-def _render_project_details(project: models.Project, include_messages: bool) -> str:
-    lines: list[str] = [
-        f"- Проект: «{project.name}»",
-        f"  Описание: {_clip(project.description or '—', 2200)}",
-        f"  Участников: {len(project.members or [])}; задач: {len(project.tasks or [])}; файлов: {len(project.files or [])}",
-    ]
-    if project.owner:
-        lines.append(f"  Владелец: {project.owner.name} ({project.owner.email or 'без email'})")
-
-    members = project.members or []
-    if members:
-        lines.append("  Участники:")
-        for member in members:
-            if not member.user:
+        sibling_lines: list[str] = []
+        for item in (course.assignments or [])[: MAX_ASSIGNMENTS_IN_CONTEXT + 2]:
+            if item.id == assignment.id:
                 continue
-            lines.append(
-                f"    - {member.user.name} ({member.user.email or 'без email'}), роль: {member.role}"
+            sibling_lines.append(
+                f"- «{item.title}»: {_fmt_assignment_status(item.status)}, дедлайн {item.deadline or _fmt_dt(item.deadline_dt)}"
             )
+            if len(sibling_lines) >= MAX_ASSIGNMENTS_IN_CONTEXT:
+                break
+
+        if sibling_lines:
+            assembler.add("Другие задания курса (нагрузка и приоритеты)", "\n".join(sibling_lines), BUDGET_ENTITIES)
+
+        assembler.add("Excerpts из материалов курса", _course_material_excerpts(course, keywords, max_items=2), BUDGET_EXCERPTS)
+
+    return assembler.build("Контекст для помощи по заданию")
+
+
+def _build_chat_context_text(
+    route: str,
+    courses: list[models.Course],
+    schedule_events: list[models.ScheduleEvent],
+    projects: list[models.Project],
+    derived: DerivedFacts,
+    keywords: list[str],
+) -> str:
+    assembler = PriorityContextAssembler(CHAT_CONTEXT_CHAR_LIMIT)
+
+    assembler.add("Stable snapshot", _render_workspace_snapshot(courses, schedule_events, projects), BUDGET_FACTS)
+    assembler.add("Derived facts", _render_derived_block(derived), BUDGET_FACTS)
+
+    if route == _CHAT_ROUTE_COURSE:
+        selected_courses = _select_relevant_courses(courses, keywords, max_items=2)
+        if selected_courses:
+            assembler.add("Relevant courses", "\n\n".join(_render_course_summary(c) for c in selected_courses), BUDGET_ENTITIES)
+            assembler.add("Relevant assignments", "\n\n".join(_render_course_assignment_briefs(c, limit=5) for c in selected_courses), BUDGET_ENTITIES)
+            assembler.add("Excerpts", "\n\n".join(_course_material_excerpts(c, keywords, max_items=2) for c in selected_courses), BUDGET_EXCERPTS)
+
+    elif route == _CHAT_ROUTE_ASSIGNMENT:
+        selected = _select_relevant_assignments(courses, keywords, max_items=2)
+        if selected:
+            details = [_render_assignment_summary(assignment, course) for course, assignment in selected]
+            excerpts = [_assignment_file_excerpt(assignment, keywords) for _, assignment in selected]
+            assembler.add("Relevant assignments", "\n\n".join(details), BUDGET_ENTITIES)
+            assembler.add("Excerpts", "\n\n".join(excerpts), BUDGET_EXCERPTS)
+
+    elif route == _CHAT_ROUTE_SCHEDULE_DEADLINE:
+        assembler.add("Расписание", _render_schedule_snapshot(schedule_events), BUDGET_ENTITIES)
+        assembler.add("Учебный timeline", _render_assignment_timeline(courses), BUDGET_ENTITIES)
+        assembler.add("Проектный timeline", _render_project_timeline(projects), BUDGET_ENTITIES)
+
+    elif route == _CHAT_ROUTE_PROJECT:
+        selected_projects = _select_relevant_projects(projects, keywords, max_items=2)
+        if selected_projects:
+            assembler.add("Relevant projects", "\n\n".join(_render_project_summary(p) for p in selected_projects), BUDGET_ENTITIES)
+            assembler.add("Риски по задачам", "\n\n".join(_render_task_risks(p) for p in selected_projects), BUDGET_ENTITIES)
+            assembler.add("Recent signals", "\n\n".join(_collect_project_signals(p, keywords) for p in selected_projects), BUDGET_ENTITIES)
+            assembler.add("Excerpts файлов", "\n\n".join(_project_file_excerpts(p, keywords, max_items=2) for p in selected_projects), BUDGET_EXCERPTS)
+
+    elif route == _CHAT_ROUTE_PLANNING_PRODUCTIVITY:
+        selected_courses = _select_relevant_courses(courses, keywords, max_items=3)
+        selected_projects = _select_relevant_projects(projects, keywords, max_items=2)
+
+        if selected_courses:
+            assembler.add("Приоритетные курсы", "\n\n".join(_render_course_summary(c) for c in selected_courses), BUDGET_ENTITIES)
+        if selected_projects:
+            assembler.add("Приоритетные проекты", "\n\n".join(_render_project_summary(p) for p in selected_projects), BUDGET_ENTITIES)
+
+        assembler.add("Дедлайны", _render_assignment_timeline(courses), BUDGET_ENTITIES)
+        assembler.add("Дедлайны проектов", _render_project_timeline(projects), BUDGET_ENTITIES)
+
     else:
-        lines.append("  Участники: нет данных.")
+        selected_courses = _select_relevant_courses(courses, keywords, max_items=3)
+        selected_projects = _select_relevant_projects(projects, keywords, max_items=2)
 
-    tasks = project.tasks or []
-    if tasks:
-        lines.append("  Задачи проекта:")
-        for task in tasks:
-            assignee = task.assignee.name if task.assignee else "Без исполнителя"
-            lines.append(
-                f"    - «{task.title}»; статус: {_fmt_task_status(task.status)}; дедлайн: {_fmt_dt(task.due_date)}; ответственный: {assignee}"
-            )
-            lines.append(f"      Описание: {_clip(task.description or '—', 850)}")
+        if selected_courses:
+            assembler.add("Relevant courses", "\n\n".join(_render_course_summary(c) for c in selected_courses), BUDGET_ENTITIES)
+        if selected_projects:
+            assembler.add("Relevant projects", "\n\n".join(_render_project_summary(p) for p in selected_projects), BUDGET_ENTITIES)
 
-            comments = task.comments or []
-            if comments:
-                lines.append(f"      Комментарии ({len(comments)}):")
-                for comment in comments[:MAX_TASK_COMMENTS_IN_CONTEXT]:
-                    author = comment.author.name if comment.author else "Участник"
-                    lines.append(
-                        f"        - {_fmt_dt(comment.created_at)}; {author}: {_clip(comment.body, COMMENT_TEXT_LIMIT)}"
-                    )
-                if len(comments) > MAX_TASK_COMMENTS_IN_CONTEXT:
-                    lines.append(
-                        f"        - ...ещё {len(comments) - MAX_TASK_COMMENTS_IN_CONTEXT} комментариев"
-                    )
-            else:
-                lines.append("      Комментарии: нет.")
-    else:
-        lines.append("  Задачи проекта: нет.")
+        assembler.add("Учебный timeline", _render_assignment_timeline(courses), BUDGET_ENTITIES)
 
-    files = project.files or []
-    if files:
-        lines.append("  Файлы проекта:")
-        for file_item in files:
-            uploader = file_item.uploader.name if file_item.uploader else "Участник"
-            lines.append(
-                f"    - {file_item.name} ({file_item.mime_type or 'тип не указан'}, {file_item.size_bytes} байт), загрузил: {uploader}"
-            )
-            text, state = extract_file_text(file_item.file_path, PROJECT_FILE_TEXT_LIMIT)
-            if text:
-                lines.append(f"      Текст файла:\n{_clip(text, PROJECT_FILE_TEXT_LIMIT)}")
-            else:
-                lines.append(f"      Текст файла: {state}.")
-    else:
-        lines.append("  Файлы проекта: нет.")
+    if courses:
+        raw_lines: list[str] = []
+        for course in _select_relevant_courses(courses, keywords, max_items=1):
+            for material in (course.materials or [])[:1]:
+                raw_text, state = extract_file_text(material.file_path, RAW_FILE_TAIL_BUDGET)
+                raw_lines.append(f"- {material.name}:\n{raw_text}" if raw_text else f"- {material.name}: {state}.")
+        if raw_lines:
+            assembler.add("Raw text fallback", "\n".join(raw_lines), BUDGET_RAW_TEXT)
 
-    if include_messages:
-        messages = sorted(project.messages or [], key=lambda item: item.created_at, reverse=True)
-        if messages:
-            lines.append(
-                f"  Последние сообщения проекта (показаны последние {min(MAX_PROJECT_MESSAGES_IN_CONTEXT, len(messages))}):"
-            )
-            for message in messages[:MAX_PROJECT_MESSAGES_IN_CONTEXT]:
-                author = message.author.name if message.author else "Участник"
-                lines.append(
-                    f"    - {_fmt_dt(message.created_at)}; {author}: {_clip(message.body, MESSAGE_TEXT_LIMIT)}"
-                )
-        else:
-            lines.append("  Сообщения проекта: нет.")
-    return "\n".join(lines) + "\n"
+    return assembler.build("Контекст для ответа в чате")
 
+def build_chat_context_package(
+    db: Session,
+    user_id: int,
+    messages: list[object],
+) -> ChatContextPackage:
+    normalized = [item for item in (_normalize_history_message(raw) for raw in messages) if item is not None]
 
-def _render_derived_block(derived: dict[str, list[str]]) -> str:
-    lines = ["\nАгрегированные факты для аналитики:\n"]
-    if derived["overdue"]:
-        lines.append("Просрочки:")
-        for item in derived["overdue"]:
-            lines.append(f"- {item}")
-    else:
-        lines.append("Просрочки: нет.")
+    courses, schedule_events, projects = _load_workspace_data(db, user_id)
 
-    if derived["upcoming"]:
-        lines.append("Ближайшие дедлайны:")
-        for item in derived["upcoming"]:
-            lines.append(f"- {item}")
-    else:
-        lines.append("Ближайшие дедлайны: нет.")
+    last_message = _last_user_message(normalized)
+    route, route_reason = classify_chat_intent(last_message, courses, projects)
+    route_label = CHAT_ROUTE_LABELS.get(route, CHAT_ROUTE_LABELS[_CHAT_ROUTE_STUDY_GENERAL])
 
-    if derived["today_events"]:
-        lines.append("Расписание на сегодня:")
-        for item in derived["today_events"]:
-            lines.append(f"- {item}")
-    else:
-        lines.append("Расписание на сегодня: занятий нет.")
+    keywords = extract_keywords(last_message)
+    derived = _calc_workspace_derived(courses, schedule_events, projects)
 
-    if derived["conflicts"]:
-        lines.append("Конфликты сроков:")
-        for item in derived["conflicts"]:
-            lines.append(f"- {item}")
-    else:
-        lines.append("Конфликты сроков: явных пересечений нет.")
+    context_text = _build_chat_context_text(route, courses, schedule_events, projects, derived, keywords)
+    recent_messages, older_history_summary = split_chat_history(normalized)
 
-    if derived["assignee_load"]:
-        lines.append("Нагрузка по исполнителям:")
-        for item in derived["assignee_load"]:
-            lines.append(f"- {item}")
-    else:
-        lines.append("Нагрузка по исполнителям: недостаточно данных.")
-    return "\n".join(lines) + "\n"
+    return ChatContextPackage(
+        route=route,
+        route_label=route_label,
+        route_reason=route_reason,
+        keywords=keywords,
+        context_text=context_text,
+        recent_messages=recent_messages,
+        older_history_summary=older_history_summary,
+    )
 
 
 def build_workspace_context(db: Session, user_id: int, *, for_chat: bool = False) -> str:
-    courses = _course_query(db, user_id).all()
-    schedule_events = (
-        db.query(models.ScheduleEvent)
-        .filter(models.ScheduleEvent.user_id == user_id)
-        .order_by(models.ScheduleEvent.day_index.asc(), models.ScheduleEvent.start_minute.asc())
-        .all()
-    )
-    projects = _project_query_for_user(db, user_id).all()
-    derived = _calc_workspace_derived(courses, schedule_events, projects)
-
-    max_chars = CHAT_CONTEXT_CHAR_LIMIT if for_chat else WORKSPACE_CONTEXT_CHAR_LIMIT
-    builder = ContextBuilder(max_chars)
-
-    builder.add("Контекст workspace пользователя:\n\n")
-    builder.add(f"Курсов: {len(courses)}\n")
-    for course in courses:
-        builder.add(_render_course_details(course, include_material_text=True, include_assignment_file_text=True))
-
-    builder.add("\nРасписание пользователя:\n")
-    if schedule_events:
-        for event in schedule_events:
-            start_h = event.start_minute // 60
-            start_m = event.start_minute % 60
-            end_total = event.start_minute + event.duration_minutes
-            end_h = end_total // 60
-            end_m = end_total % 60
-            builder.add(
-                f"- {_fmt_day_index(event.day_index)} {start_h:02d}:{start_m:02d}-{end_h:02d}:{end_m:02d} — {event.title} ({event.location or 'локация не указана'})\n"
-            )
-    else:
-        builder.add("- Расписание пустое.\n")
-
-    builder.add(f"\nПроектов: {len(projects)}\n")
-    if projects:
-        for project in projects:
-            builder.add(_render_project_details(project, include_messages=True))
-    else:
-        builder.add("Проекты отсутствуют.\n")
-
-    builder.add(_render_derived_block(derived))
-    return builder.build()
+    if for_chat:
+        return build_chat_context_package(db, user_id, []).context_text
+    return build_workspace_summary_context(db, user_id)
 
 
 def build_project_context(db: Session, project_id: int, user_id: int) -> str | None:
-    project = _project_query_by_id_for_user(db, project_id, user_id).first()
-    if not project:
-        return None
-
-    now = datetime.now()
-    single_project_courses: list[models.Course] = []
-    single_schedule: list[models.ScheduleEvent] = []
-    derived = _calc_workspace_derived(single_project_courses, single_schedule, [project])
-
-    builder = ContextBuilder(PROJECT_CONTEXT_CHAR_LIMIT)
-    builder.add("Контекст командного проекта:\n\n")
-    builder.add(_render_project_details(project, include_messages=True))
-    builder.add(_render_derived_block(derived))
-    if project.created_at:
-        builder.add(f"\nДата создания проекта: {_fmt_dt(project.created_at)}\n")
-    builder.add(f"Текущий момент анализа: {_fmt_dt(now)}\n")
-    return builder.build()
+    return build_project_summary_context(db, project_id, user_id)
 
 
 def build_chat_context(db: Session, user_id: int) -> str:
     return build_workspace_context(db, user_id, for_chat=True)
-

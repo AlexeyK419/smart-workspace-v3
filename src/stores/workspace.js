@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { parseRuDate, formatTimeFromMinutes, currentDayIndex } from '@/utils/dates'
 
 const AI_CACHE_STORAGE_KEY = 'workspace_ai_summary_cache_v1'
+const AI_CONTEXT_VERSION_SALT = 'ai_ctx_v2'
 
 function normalizeScheduleEvent(event) {
   const startMinute = Number(event.start_minute)
@@ -385,7 +386,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       .sort()
       .join('@@')
 
-    return [coursePart, schedulePart, projectPart].join('###')
+    return [AI_CONTEXT_VERSION_SALT, coursePart, schedulePart, projectPart].join('###')
   }
 
   const workspaceAiContextKey = computed(() => buildWorkspaceAiContextKey())
@@ -424,6 +425,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       .join('~')
 
     return [
+      AI_CONTEXT_VERSION_SALT,
       project.id,
       project.name || '',
       project.description || '',

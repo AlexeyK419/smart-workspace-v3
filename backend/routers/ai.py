@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ai_context import (
     build_assignment_help_context,
-    build_chat_context,
+    build_chat_context_package,
     build_course_plan_context,
     build_project_context,
     build_workspace_context,
@@ -130,7 +130,13 @@ async def ai_chat(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    context_text = build_chat_context(db, current_user.id)
+    chat_context = build_chat_context_package(db, current_user.id, req.messages)
+    keywords_text = ", ".join(chat_context.keywords[:10]) if chat_context.keywords else "нет выраженных ключевых слов"
+    history_summary_block = (
+        f"\n\nСжатая история старых сообщений:\n{chat_context.older_history_summary}"
+        if chat_context.older_history_summary
+        else ""
+    )
     system_messages = [
         Message(role="system", content=SYSTEM_CHAT),
         Message(
@@ -138,11 +144,15 @@ async def ai_chat(
             content=(
                 "Фактический контекст workspace пользователя. "
                 "Используй его как источник фактов, не выдумывай данные:\n\n"
-                f"{context_text}"
+                f"Маршрут контекста: {chat_context.route_label}\n"
+                f"Пояснение маршрута: {chat_context.route_reason}\n"
+                f"Ключевые слова: {keywords_text}\n\n"
+                f"{chat_context.context_text}"
+                f"{history_summary_block}"
             ),
         ),
     ]
-    history = [Message(role=m.role, content=m.content) for m in req.messages]
+    history = [Message(role=m.role, content=m.content) for m in chat_context.recent_messages]
 
     try:
         reply = await chat_complete(
@@ -206,7 +216,7 @@ async def assignment_help(
 ):
     assignment = get_assignment_for_user_or_404(assignment_id, current_user.id, db)
     course = _course_with_details_for_user(assignment.course_id, current_user.id, db)
-    context_text = build_assignment_help_context(assignment, course)
+    context_text = build_assignment_help_context(assignment, course, req.question)
 
     question_block = f"Вопрос пользователя: {req.question.strip()}\n\n" if req.question.strip() else ""
     user_prompt = (
