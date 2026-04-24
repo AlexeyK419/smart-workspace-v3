@@ -5,6 +5,7 @@ import SchedulePage from '@/pages/SchedulePage.vue'
 import WelcomePage from '@/pages/WelcomePage.vue'
 import ProjectDetailPage from '@/pages/ProjectDetailPage.vue'
 import SettingsPage from '@/pages/SettingsPage.vue'
+import ChatsPage from '@/pages/ChatsPage.vue'
 
 const routes = [
   {
@@ -30,6 +31,12 @@ const routes = [
     name: 'schedule',
     component: SchedulePage,
     meta: { breadcrumb: 'Расписание', requiresAuth: true },
+  },
+  {
+    path: '/chats',
+    name: 'chats',
+    component: ChatsPage,
+    meta: { breadcrumb: 'Чаты', requiresAuth: true },
   },
   {
     path: '/projects/:id',

@@ -28,6 +28,12 @@
         Расписание
       </RouterLink>
 
+      <RouterLink to="/chats" class="nav-item" active-class="active" @click="emitClose">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16c1.1 0 2 .9 2 2v9c0 1.1-.9 2-2 2H8.83L4 21v-4H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2Zm0 2v9h2v1.7L8.17 15H20V6H4Zm4 3h8v2H8V9Zm0 3h5v2H8v-2Z"/></svg>
+        <span class="nav-copy">Чаты</span>
+        <span v-if="chatsStore.unreadTotal" class="nav-badge">{{ chatsStore.unreadTotal > 99 ? '99+' : chatsStore.unreadTotal }}</span>
+      </RouterLink>
+
       <div class="nav-section-label" style="margin-top: 8px">Курсы</div>
 
       <div class="courses-header" @click="coursesOpen = !coursesOpen">
@@ -186,6 +192,7 @@ import { ref, inject, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useAuthStore } from '@/stores/auth'
+import { useChatsStore } from '@/stores/chats'
 
 defineProps({
   open: {
@@ -198,6 +205,7 @@ const emit = defineEmits(['close'])
 
 const store = useWorkspaceStore()
 const authStore = useAuthStore()
+const chatsStore = useChatsStore()
 const router = useRouter()
 const coursesOpen = ref(true)
 const projectsOpen = ref(true)
@@ -358,6 +366,24 @@ async function logout() {
 }
 .nav-item.active svg {
   opacity: 1;
+}
+.nav-copy {
+  flex: 1;
+}
+.nav-badge {
+  margin-left: auto;
+  min-width: 22px;
+  height: 20px;
+  border-radius: 999px;
+  padding: 0 7px;
+  background: var(--danger);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
 }
 .courses-header {
   display: flex;

@@ -33,12 +33,14 @@ import AiChatWidget from '@/components/widgets/AiChatWidget.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { useChatsStore } from '@/stores/chats'
 
 const route = useRoute()
 const router = useRouter()
 const store = useWorkspaceStore()
 const authStore = useAuthStore()
 const uiStore = useUiStore()
+const chatsStore = useChatsStore()
 const showAddCourse = ref(false)
 
 provide('openAddCourse', () => (showAddCourse.value = true))
@@ -55,11 +57,13 @@ watch(
 
     if (isAuthenticated) {
       store.markWorkspaceHydrated(false)
-      await Promise.all([store.fetchCourses(), store.fetchSchedule(), store.fetchProjects()])
+      await Promise.all([store.fetchCourses(), store.fetchSchedule(), store.fetchProjects(), chatsStore.fetchChats()])
+      chatsStore.connectSocket()
       store.markWorkspaceHydrated(true)
       if (route.meta.guestOnly) router.replace('/')
     } else {
       store.resetWorkspace()
+      chatsStore.reset()
       if (!route.meta.guestOnly) router.replace('/welcome')
     }
   },

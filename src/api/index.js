@@ -105,6 +105,17 @@ export const api = {
   getCourses:     () => request('GET', '/users/me/courses'),
   searchUsers:    (query) => request('GET', `/users/search?q=${encodeURIComponent(query)}`),
 
+  getChats:        () => request('GET', '/chats/'),
+  getChat:         (chatId) => request('GET', `/chats/${chatId}`),
+  createDirectChat: (data) => request('POST', '/chats/', data),
+  getChatMessages: (chatId) => request('GET', `/chats/${chatId}/messages`),
+  postChatMessage: (chatId, data) => request('POST', `/chats/${chatId}/messages`, data),
+  markChatRead:    (chatId) => request('POST', `/chats/${chatId}/read`),
+  chatsSocketUrl:  () => {
+    const token = encodeURIComponent(authToken || '')
+    return `${toWebSocketBase(BASE)}/ws/chats/?token=${token}`
+  },
+
   getCourse:     (id)   => request('GET',    `/courses/${id}`),
   createCourse:  (data) => request('POST',   '/courses/', data),
   updateCourse:  (id, data) => request('PATCH', `/courses/${id}`, data),

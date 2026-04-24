@@ -25,6 +25,10 @@
           <span class="breadcrumb-current">Расписание</span>
         </template>
 
+        <template v-else-if="route.name === 'chats'">
+          <span class="breadcrumb-current">Чаты</span>
+        </template>
+
         <template v-else-if="route.name === 'project' && currentProject">
           <span class="breadcrumb-item" @click="router.push('/')">Командные проекты</span>
           <span class="breadcrumb-sep">›</span>
