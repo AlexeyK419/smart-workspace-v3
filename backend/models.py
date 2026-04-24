@@ -58,6 +58,26 @@ class User(Base):
         back_populates="author",
         foreign_keys="ProjectMessage.author_id",
     )
+    direct_chats_as_first_user: Mapped[list["DirectChat"]] = relationship(
+        "DirectChat",
+        back_populates="first_user",
+        foreign_keys="DirectChat.first_user_id",
+    )
+    direct_chats_as_second_user: Mapped[list["DirectChat"]] = relationship(
+        "DirectChat",
+        back_populates="second_user",
+        foreign_keys="DirectChat.second_user_id",
+    )
+    direct_chat_participations: Mapped[list["DirectChatParticipant"]] = relationship(
+        "DirectChatParticipant",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    direct_messages: Mapped[list["DirectMessage"]] = relationship(
+        "DirectMessage",
+        back_populates="sender",
+        foreign_keys="DirectMessage.sender_id",
+    )
 
 
 class Course(Base):
@@ -230,3 +250,63 @@ class ProjectMessage(Base):
 
     project: Mapped["Project"] = relationship("Project", back_populates="messages")
     author: Mapped["User"] = relationship("User", back_populates="project_messages", foreign_keys=[author_id])
+
+
+class DirectChat(Base):
+    __tablename__ = "direct_chats"
+    __table_args__ = (UniqueConstraint("first_user_id", "second_user_id", name="uq_direct_chat_pair"),)
+
+    id:             Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    first_user_id:  Mapped[int]      = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    second_user_id: Mapped[int]      = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    created_at:     Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at:     Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    first_user: Mapped["User"] = relationship(
+        "User",
+        back_populates="direct_chats_as_first_user",
+        foreign_keys=[first_user_id],
+    )
+    second_user: Mapped["User"] = relationship(
+        "User",
+        back_populates="direct_chats_as_second_user",
+        foreign_keys=[second_user_id],
+    )
+    participants: Mapped[list["DirectChatParticipant"]] = relationship(
+        "DirectChatParticipant",
+        back_populates="chat",
+        cascade="all, delete-orphan",
+    )
+    messages: Mapped[list["DirectMessage"]] = relationship(
+        "DirectMessage",
+        back_populates="chat",
+        cascade="all, delete-orphan",
+        order_by="DirectMessage.created_at.asc()",
+    )
+
+
+class DirectChatParticipant(Base):
+    __tablename__ = "direct_chat_participants"
+    __table_args__ = (UniqueConstraint("chat_id", "user_id", name="uq_direct_chat_participant"),)
+
+    id:           Mapped[int]             = mapped_column(Integer, primary_key=True, index=True)
+    chat_id:      Mapped[int]             = mapped_column(Integer, ForeignKey("direct_chats.id"), index=True)
+    user_id:      Mapped[int]             = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    last_read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at:   Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow)
+
+    chat: Mapped["DirectChat"] = relationship("DirectChat", back_populates="participants")
+    user: Mapped["User"] = relationship("User", back_populates="direct_chat_participations")
+
+
+class DirectMessage(Base):
+    __tablename__ = "direct_messages"
+
+    id:         Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    chat_id:    Mapped[int]      = mapped_column(Integer, ForeignKey("direct_chats.id"), index=True)
+    sender_id:  Mapped[int]      = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    body:       Mapped[str]      = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+    chat: Mapped["DirectChat"] = relationship("DirectChat", back_populates="messages")
+    sender: Mapped["User"] = relationship("User", back_populates="direct_messages", foreign_keys=[sender_id])

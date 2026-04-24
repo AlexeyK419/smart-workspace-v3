@@ -194,6 +194,14 @@ class ProjectMessageCreate(BaseModel):
     body: str = Field(min_length=1, max_length=2000)
 
 
+class DirectChatCreate(BaseModel):
+    target_user_id: int
+
+
+class DirectMessageCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=4000)
+
+
 class ProjectMemberOut(BaseModel):
     id: int
     project_id: int
@@ -257,6 +265,30 @@ class ProjectMessageOut(BaseModel):
     body: str
     created_at: datetime
     author: UserOut | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class DirectMessageOut(BaseModel):
+    id: int
+    chat_id: int
+    sender_id: int
+    body: str
+    created_at: datetime
+    sender: UserOut | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class DirectChatOut(BaseModel):
+    id: int
+    first_user_id: int
+    second_user_id: int
+    created_at: datetime
+    updated_at: datetime
+    peer: UserOut
+    last_message: DirectMessageOut | None = None
+    unread_count: int = 0
 
     model_config = {"from_attributes": True}
 

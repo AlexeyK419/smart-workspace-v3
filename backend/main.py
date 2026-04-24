@@ -21,7 +21,7 @@ from auth import compute_initials, hash_password
 from config import settings
 from database import engine, SessionLocal
 import models
-from routers import auth, users, courses, materials, assignments, ai, schedule, projects
+from routers import auth, users, courses, materials, assignments, ai, schedule, projects, chats
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -322,4 +322,6 @@ app.include_router(assignments.router)
 app.include_router(schedule.router)
 app.include_router(projects.router)
 app.include_router(projects.ws_router)
+app.include_router(chats.router)
+app.include_router(chats.ws_router)
 app.include_router(ai.router)
