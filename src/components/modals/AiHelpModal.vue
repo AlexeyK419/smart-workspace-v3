@@ -32,31 +32,23 @@
           ></textarea>
         </div>
 
-        <div v-if="isLoading" class="loading-state">
-          <div class="assistant-badge">
-            <span class="assistant-dot"></span>
-            Ассистент Workspace
-          </div>
-          <div class="dots"><span></span><span></span><span></span></div>
-          <span>Анализирует задание и готовит подсказки...</span>
-        </div>
-
-        <div v-else-if="error" class="error-state">
-          <div class="error-icon">⚠️</div>
-          <div class="error-title">Ошибка</div>
-          <div class="error-msg">{{ error }}</div>
-          <button class="btn btn-ghost" style="margin-top:12px" @click="error = ''">Попробовать снова</button>
-        </div>
-
-        <div v-else-if="advice" class="advice-content">
-          <div class="advice-header">
-            <div class="assistant-badge">
-              <span class="assistant-dot"></span>
-              Подсказка от ассистента
-            </div>
-          </div>
-          <div class="advice-body" v-html="renderedAdvice"></div>
-        </div>
+        <AiRecommendationCard
+          v-if="isLoading || error || advice"
+          title="AI-помощь к заданию"
+          description="Разбор смысла задания, стартовый фокус, риски и следующий безопасный шаг."
+          variant="assignment"
+          :text="advice"
+          :loading="isLoading"
+          :error="error"
+          loading-text="Ассистент анализирует задание и готовит подсказки"
+          empty-title="Подсказка пока не готова"
+          empty-text="Задайте вопрос или запросите помощь, чтобы получить структурированную рекомендацию."
+          compact
+        >
+          <template #actions>
+            <button v-if="error" class="btn btn-ghost compact-action" @click="error = ''">Попробовать снова</button>
+          </template>
+        </AiRecommendationCard>
 
         <div v-else class="initial-state">
           <div class="initial-icon">💡</div>
@@ -79,7 +71,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
+import AiRecommendationCard from '@/components/ai/AiRecommendationCard.vue'
 import { api } from '@/api/index.js'
 
 const props = defineProps({
@@ -110,22 +103,6 @@ async function getHelp() {
   }
 }
 
-const renderedAdvice = computed(() => {
-  if (!advice.value) return ''
-  return advice.value
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/^(\d+)\. (.+)$/gm, '<li><span class="li-num">$1.</span> $2</li>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/<\/li>\n<li>/g, '</li><li>')
-    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
-    .replace(/<p><\/p>/g, '')
-})
 </script>
 
 <style scoped>
@@ -167,56 +144,6 @@ const renderedAdvice = computed(() => {
   resize: vertical;
   min-height: 60px;
 }
-.assistant-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--accent);
-  background: var(--accent-light);
-  border: 1px solid var(--accent-mid);
-  border-radius: 99px;
-  padding: 3px 10px;
-}
-.assistant-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--accent);
-  display: inline-block;
-}
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 40px 20px;
-}
-.loading-state span {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.error-state {
-  text-align: center;
-  padding: 30px 20px;
-}
-.error-icon {
-  font-size: 32px;
-  margin-bottom: 10px;
-}
-.error-title {
-  font-weight: 600;
-  font-size: 15px;
-  margin-bottom: 6px;
-}
-.error-msg {
-  font-size: 13px;
-  color: var(--danger);
-  background: var(--danger-bg);
-  border-radius: 8px;
-  padding: 10px 14px;
-}
 .initial-state {
   text-align: center;
   padding: 30px 20px;
@@ -229,24 +156,11 @@ const renderedAdvice = computed(() => {
 .initial-note {
   margin-top: 6px;
 }
-.advice-header {
-  margin-bottom: 14px;
-}
-.advice-body {
-  line-height: 1.8;
-  color: var(--text-secondary);
-  font-size: 13.5px;
-}
-.advice-body :deep(h1) { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin: 18px 0 8px; color: var(--text-primary); }
-.advice-body :deep(h2) { font-family: var(--font-display); font-size: 16px; font-weight: 600; margin: 14px 0 6px; color: var(--text-primary); }
-.advice-body :deep(h3) { font-size: 14px; font-weight: 600; margin: 10px 0 4px; color: var(--text-primary); }
-.advice-body :deep(strong) { font-weight: 600; color: var(--text-primary); }
-.advice-body :deep(ul) { list-style: none; padding-left: 0; margin: 8px 0; }
-.advice-body :deep(li) { display: flex; gap: 8px; padding: 3px 0; }
-.advice-body :deep(li)::before { content: '—'; color: var(--text-muted); flex-shrink: 0; }
-.advice-body :deep(.li-num) { color: var(--accent); font-weight: 600; flex-shrink: 0; }
-.advice-body :deep(p) { margin: 8px 0; }
 .ai-btn svg {
   margin-right: 2px;
+}
+.compact-action {
+  padding: 7px 11px;
+  font-size: 12px;
 }
 </style>

@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     # RouterAI (OpenAI-compatible)
     routerai_api_key: str = ""
     routerai_base_url: str = "https://routerai.ru/api/v1"
-    routerai_model: str = "google/gemma-4-26b-a4b-it"
+    routerai_model: str = "deepseek/deepseek-v4-flash"
     routerai_timeout_sec: int = 60
 
     # CORS
