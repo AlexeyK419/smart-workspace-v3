@@ -5,8 +5,7 @@
         <svg viewBox="0 0 24 24"><path d="M12 3L2 8.5V15.5L12 21L22 15.5V8.5L12 3ZM12 5.15L20 9.5V15L12 18.85L4 15V9.5L12 5.15Z" fill="white"/></svg>
       </div>
       <div>
-        <div class="logo-text">WorkSpace</div>
-        <div class="logo-sub">Student Platform</div>
+        <div class="logo-text">Учебное пространство</div>
       </div>
       <button class="sidebar-close" type="button" aria-label="Закрыть меню" @click="emitClose">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

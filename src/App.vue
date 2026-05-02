@@ -2,7 +2,7 @@
   <div v-if="!authStore.isReady" class="boot-screen">
     <div class="boot-card">
       <div class="boot-logo">WS</div>
-      <div class="boot-title">Smart Student Workspace</div>
+      <div class="boot-title">Интеллектуальное учебное пространство</div>
       <div class="boot-sub">Подготавливаем ваше пространство…</div>
     </div>
   </div>

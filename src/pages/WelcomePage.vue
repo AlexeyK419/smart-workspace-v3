@@ -1,7 +1,7 @@
 <template>
   <div class="welcome-shell">
     <div class="welcome-hero">
-      <div class="hero-badge">Student OS</div>
+      <div class="hero-badge">Интеллектуальное учебное пространство</div>
       <h1>Управляй учёбой в одном месте</h1>
       <p>
         Курсы, материалы, дедлайны, компактный календарь, расписание и встроенный помощник —
@@ -63,7 +63,7 @@
 
       <form v-else class="auth-form" @submit.prevent="submitRegister">
         <h2>Создайте аккаунт</h2>
-        <p class="auth-sub">После регистрации вы сразу попадёте в своё личное рабочее пространство.</p>
+        <p class="auth-sub">После регистрации вы сразу попадёте в своё личное учебное пространство.</p>
 
         <label>
           <span>Имя</span>

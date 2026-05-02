@@ -7,11 +7,11 @@
         </svg>
       </button>
 
-      <RouterLink to="/" class="mobile-brand" aria-label="WorkSpace">
-        <span class="mobile-logo">W</span>
+      <RouterLink to="/" class="mobile-brand" aria-label="Интеллектуальное учебное пространство">
+        <span class="mobile-logo">И</span>
         <span>
-          <strong>WorkSpace</strong>
-          <small>Student Platform</small>
+          <strong>ИУП</strong>
+          <small>Учебное пространство</small>
         </span>
       </RouterLink>
 

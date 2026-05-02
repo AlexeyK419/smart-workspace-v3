@@ -1,15 +1,15 @@
 <template>
   <AiRecommendationCard
     class="ai-workspace-card"
-    title="AI-рекомендации workspace"
+    title="AI-рекомендации учебного пространства"
     description="Краткий срез по дедлайнам, расписанию, проектам и рискам на сегодня."
     variant="workspace"
     :text="summary"
     :loading="isLoading"
     :error="error"
-    loading-text="Ассистент анализирует workspace"
+    loading-text="Ассистент анализирует учебное пространство"
     empty-title="Сводка пока недоступна"
-    empty-text="Нажмите «Обновить», чтобы сформировать AI-сводку workspace."
+    empty-text="Нажмите «Обновить», чтобы сформировать AI-сводку учебного пространства."
   >
     <template #actions>
       <button class="btn btn-ghost ai-refresh" :disabled="isLoading" @click="fetchSummary">

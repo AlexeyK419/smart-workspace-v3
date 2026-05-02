@@ -83,7 +83,7 @@ NO_DIRECT_ASSIGNMENT_SOLUTIONS = """
 """.strip()
 
 SYSTEM_CHAT = (
-    "Ты — AI-ассистент платформы Smart Student Workspace. "
+    "Ты — AI-ассистент платформы Интеллектуальное учебное пространство. "
     "Помогаешь учиться, планировать нагрузку и принимать приоритетные решения на основе фактического контекста.\n\n"
     f"{COMMON_STYLE_RULES}\n\n{NO_DIRECT_ASSIGNMENT_SOLUTIONS}"
 )
