@@ -10,6 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from auth import ensure_project_owner, get_current_user, get_project_for_user_or_404, get_user_by_token
+from ai_embeddings import delete_context_chunks
 from database import SessionLocal, get_db
 import models
 import schemas
@@ -225,6 +226,7 @@ def delete_project(
     for item in project.files:
         if item.file_path and os.path.exists(item.file_path):
             os.remove(item.file_path)
+    delete_context_chunks(db, parent_type="project", parent_id=project.id)
     db.delete(project)
     db.commit()
 
@@ -418,6 +420,7 @@ def delete_task(
 ):
     _project_for_member_or_404(project_id, current_user.id, db)
     task = _get_task_or_404(project_id, task_id, db)
+    delete_context_chunks(db, entity_type="project_task", entity_id=task.id)
     db.delete(task)
     db.commit()
 
@@ -521,6 +524,7 @@ def delete_file(
 
     if item.file_path and os.path.exists(item.file_path):
         os.remove(item.file_path)
+    delete_context_chunks(db, entity_type="project_file", entity_id=item.id)
     db.delete(item)
     db.commit()
 

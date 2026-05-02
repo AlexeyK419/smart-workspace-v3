@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from auth import get_course_for_user_or_404, get_current_user
+from ai_embeddings import delete_context_chunks
 from database import get_db
 import models
 import schemas
@@ -119,5 +120,6 @@ def delete_material(
         raise HTTPException(404, "Material not found")
     if os.path.exists(mat.file_path):
         os.remove(mat.file_path)
+    delete_context_chunks(db, user_id=current_user.id, entity_type="material", entity_id=mat.id)
     db.delete(mat)
     db.commit()

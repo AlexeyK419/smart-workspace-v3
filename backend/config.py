@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     routerai_api_key: str = ""
     routerai_base_url: str = "https://routerai.ru/api/v1"
     routerai_model: str = "deepseek/deepseek-v4-flash"
+    routerai_embedding_model: str = "perplexity/pplx-embed-v1-4b"
     routerai_timeout_sec: int = 60
+    ai_embeddings_enabled: bool = True
 
     # CORS
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"

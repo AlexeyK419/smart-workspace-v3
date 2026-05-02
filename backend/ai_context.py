@@ -8,9 +8,17 @@ from dataclasses import dataclass
 from datetime import datetime
 import xml.etree.ElementTree as ET
 
+from pypdf import PdfReader
 from sqlalchemy.orm import Session, selectinload
 
 import models
+from ai_embeddings import (
+    ContextSource,
+    ensure_context_sources_indexed,
+    prune_stale_context_sources,
+    render_semantic_hits,
+    semantic_search_context,
+)
 
 
 TEXT_EXTENSIONS = {
@@ -248,6 +256,25 @@ def _read_zip_xml_text(path: str, member: str) -> str:
     return "\n".join(parts)
 
 
+def _read_pdf_text(path: str) -> str:
+    reader = PdfReader(path)
+    parts: list[str] = []
+    used = 0
+
+    for page in reader.pages:
+        value = _to_text(page.extract_text()).strip()
+        if not value:
+            continue
+        remaining = FILE_READ_LIMIT - used
+        if remaining <= 0:
+            break
+        clipped = value[:remaining]
+        parts.append(clipped)
+        used += len(clipped)
+
+    return "\n\n".join(parts)
+
+
 def _read_file_text_raw(file_path: str) -> tuple[str, str]:
     if not file_path:
         return "", "файл не прикреплен"
@@ -263,6 +290,8 @@ def _read_file_text_raw(file_path: str) -> tuple[str, str]:
             return _read_zip_xml_text(file_path, "content.xml")[:FILE_READ_LIMIT], "ok"
         if ext == ".docx":
             return _read_zip_xml_text(file_path, "word/document.xml")[:FILE_READ_LIMIT], "ok"
+        if ext == ".pdf":
+            return _read_pdf_text(file_path)[:FILE_READ_LIMIT], "ok"
         return "", f"тип файла {ext or 'неизвестный'} не поддерживается"
     except Exception as exc:  # pragma: no cover
         return "", f"не удалось извлечь текст ({exc.__class__.__name__})"
@@ -397,6 +426,251 @@ def extract_file_text(file_path: str | None, max_chars: int) -> tuple[str, str]:
     if not raw_text:
         return "", state
     return _clip(raw_text, max_chars), "ok"
+
+
+def _file_text_for_index(file_path: str | None) -> str:
+    text, _ = extract_file_text(file_path, FILE_READ_LIMIT)
+    return text
+
+
+def _collect_course_semantic_sources(user_id: int, courses: list[models.Course]) -> list[ContextSource]:
+    sources: list[ContextSource] = []
+    for course in courses:
+        course_bits = [
+            f"Course: {course.name}",
+            f"Teacher: {course.teacher or ''}",
+            f"Semester: {course.semester or ''}",
+            f"Progress: {course.progress:.0f}%",
+        ]
+        sources.append(
+            ContextSource(
+                user_id=user_id,
+                scope="course",
+                entity_type="course",
+                entity_id=course.id,
+                parent_type="course",
+                parent_id=course.id,
+                title=f"Курс «{course.name}»",
+                text="\n".join(course_bits),
+                metadata={"course_id": course.id},
+            )
+        )
+
+        for material in course.materials or []:
+            file_text = _file_text_for_index(material.file_path)
+            if not file_text:
+                continue
+            sources.append(
+                ContextSource(
+                    user_id=user_id,
+                    scope="course",
+                    entity_type="material",
+                    entity_id=material.id,
+                    parent_type="course",
+                    parent_id=course.id,
+                    title=f"Материал «{material.name}» / курс «{course.name}»",
+                    text=file_text,
+                    metadata={
+                        "course_id": course.id,
+                        "course_name": course.name,
+                        "material_id": material.id,
+                        "file_name": material.name,
+                    },
+                )
+            )
+
+        for assignment in course.assignments or []:
+            file_text = _file_text_for_index(assignment.file_path)
+            text = "\n".join(
+                part
+                for part in [
+                    f"Assignment: {assignment.title}",
+                    f"Course: {course.name}",
+                    f"Status: {assignment.status}",
+                    f"Deadline: {assignment.deadline or _fmt_dt(assignment.deadline_dt)}",
+                    f"Description: {assignment.description or ''}",
+                    f"Attached file: {assignment.file_name or ''}",
+                    file_text,
+                ]
+                if part.strip()
+            )
+            if not text.strip():
+                continue
+            sources.append(
+                ContextSource(
+                    user_id=user_id,
+                    scope="course",
+                    entity_type="assignment",
+                    entity_id=assignment.id,
+                    parent_type="course",
+                    parent_id=course.id,
+                    title=f"Задание «{assignment.title}» / курс «{course.name}»",
+                    text=text,
+                    metadata={
+                        "course_id": course.id,
+                        "course_name": course.name,
+                        "assignment_id": assignment.id,
+                        "assignment_title": assignment.title,
+                    },
+                )
+            )
+    return sources
+
+
+def _collect_project_semantic_sources(user_id: int, projects: list[models.Project]) -> list[ContextSource]:
+    sources: list[ContextSource] = []
+    for project in projects:
+        sources.append(
+            ContextSource(
+                user_id=user_id,
+                scope="project",
+                entity_type="project",
+                entity_id=project.id,
+                parent_type="project",
+                parent_id=project.id,
+                title=f"Проект «{project.name}»",
+                text=f"Project: {project.name}\nDescription: {project.description or ''}",
+                metadata={"project_id": project.id, "project_name": project.name},
+            )
+        )
+
+        for task in project.tasks or []:
+            comments = []
+            for comment in task.comments or []:
+                author = comment.author.name if comment.author else ""
+                comments.append(f"[{_fmt_dt(comment.created_at)}] {author}: {comment.body}")
+            text = "\n".join(
+                part
+                for part in [
+                    f"Task: {task.title}",
+                    f"Project: {project.name}",
+                    f"Status: {task.status}",
+                    f"Due date: {_fmt_dt(task.due_date)}",
+                    f"Assignee: {task.assignee.name if task.assignee else ''}",
+                    f"Description: {task.description or ''}",
+                    "\n".join(comments),
+                ]
+                if part.strip()
+            )
+            sources.append(
+                ContextSource(
+                    user_id=user_id,
+                    scope="project",
+                    entity_type="project_task",
+                    entity_id=task.id,
+                    parent_type="project",
+                    parent_id=project.id,
+                    title=f"Задача «{task.title}» / проект «{project.name}»",
+                    text=text,
+                    metadata={"project_id": project.id, "project_name": project.name, "task_id": task.id},
+                )
+            )
+
+        for file_item in project.files or []:
+            file_text = _file_text_for_index(file_item.file_path)
+            if not file_text:
+                continue
+            sources.append(
+                ContextSource(
+                    user_id=user_id,
+                    scope="project",
+                    entity_type="project_file",
+                    entity_id=file_item.id,
+                    parent_type="project",
+                    parent_id=project.id,
+                    title=f"Файл «{file_item.name}» / проект «{project.name}»",
+                    text=file_text,
+                    metadata={"project_id": project.id, "project_name": project.name, "file_id": file_item.id},
+                )
+            )
+
+        for message in project.messages or []:
+            author = message.author.name if message.author else ""
+            sources.append(
+                ContextSource(
+                    user_id=user_id,
+                    scope="project",
+                    entity_type="project_message",
+                    entity_id=message.id,
+                    parent_type="project",
+                    parent_id=project.id,
+                    title=f"Сообщение проекта «{project.name}» от {author or 'участника'}",
+                    text=f"[{_fmt_dt(message.created_at)}] {author}: {message.body}",
+                    metadata={"project_id": project.id, "project_name": project.name, "message_id": message.id},
+                )
+            )
+    return sources
+
+
+def _collect_workspace_semantic_sources(
+    user_id: int,
+    courses: list[models.Course],
+    projects: list[models.Project],
+) -> list[ContextSource]:
+    return [
+        *_collect_course_semantic_sources(user_id, courses),
+        *_collect_project_semantic_sources(user_id, projects),
+    ]
+
+
+def _collect_chat_history_semantic_sources(
+    user_id: int,
+    messages: list[ChatHistoryMessage],
+) -> list[ContextSource]:
+    sources: list[ContextSource] = []
+    for index, message in enumerate(messages):
+        content = _normalize_whitespace(message.content)
+        if not content:
+            continue
+        sources.append(
+            ContextSource(
+                user_id=user_id,
+                scope="chat_history",
+                entity_type="chat_message",
+                entity_id=index,
+                title=f"Chat history message #{index + 1} ({message.role})",
+                text=f"{message.role}: {content}",
+                metadata={"role": message.role, "message_index": index},
+            )
+        )
+    return sources
+
+
+def _semantic_context_block(
+    db: Session,
+    *,
+    user_id: int,
+    query: str,
+    sources: list[ContextSource],
+    scopes: set[str] | None = None,
+    parent_type: str | None = None,
+    parent_id: str | int | None = None,
+    limit: int = 6,
+) -> str:
+    if not query.strip():
+        return ""
+    try:
+        prune_stale_context_sources(
+            db,
+            user_id=user_id,
+            sources=sources,
+            scopes=scopes,
+            parent_type=parent_type,
+            parent_id=parent_id,
+        )
+        ensure_context_sources_indexed(db, sources)
+        hits = semantic_search_context(
+            db,
+            user_id=user_id,
+            query=query,
+            scopes=scopes,
+            parent_type=parent_type,
+            parent_id=parent_id,
+            limit=limit,
+        )
+        return render_semantic_hits(hits)
+    except Exception:  # pragma: no cover
+        return ""
 
 
 def _course_query(db: Session, user_id: int):
@@ -1072,13 +1346,66 @@ def classify_chat_intent(
     return _CHAT_ROUTE_STUDY_GENERAL, "Выбран общий учебный режим по умолчанию."
 
 
+def _semantic_route_from_hits(hits: list[object]) -> tuple[str | None, str]:
+    if not hits:
+        return None, ""
+
+    route_scores: defaultdict[str, float] = defaultdict(float)
+    route_titles: dict[str, str] = {}
+
+    for hit in hits:
+        entity_type = getattr(hit, "entity_type", "")
+        scope = getattr(hit, "scope", "")
+        score = float(getattr(hit, "score", 0.0) or 0.0)
+
+        if entity_type == "assignment":
+            route = _CHAT_ROUTE_ASSIGNMENT
+        elif scope == "course" or entity_type in {"course", "material"}:
+            route = _CHAT_ROUTE_COURSE
+        elif scope == "project" or entity_type in {"project", "project_task", "project_file", "project_message"}:
+            route = _CHAT_ROUTE_PROJECT
+        else:
+            continue
+
+        route_scores[route] += score
+        route_titles.setdefault(route, getattr(hit, "title", ""))
+
+    if not route_scores:
+        return None, ""
+
+    route, score = max(route_scores.items(), key=lambda item: item[1])
+    if score < 0.18:
+        return None, ""
+
+    title = route_titles.get(route) or "релевантный фрагмент"
+    return route, f"Маршрут уточнен semantic search: найден близкий по смыслу контекст «{title}»."
+
+
+def _should_apply_semantic_route(current_route: str, semantic_route: str | None) -> bool:
+    if not semantic_route:
+        return False
+    if current_route == _CHAT_ROUTE_STUDY_GENERAL:
+        return True
+    if current_route == _CHAT_ROUTE_COURSE and semantic_route == _CHAT_ROUTE_ASSIGNMENT:
+        return True
+    return False
+
+
 def build_workspace_summary_context(db: Session, user_id: int) -> str:
     courses, schedule_events, projects = _load_workspace_data(db, user_id)
     derived = _calc_workspace_derived(courses, schedule_events, projects)
+    semantic_block = _semantic_context_block(
+        db,
+        user_id=user_id,
+        query="workspace summary deadlines risks priorities courses projects",
+        sources=_collect_workspace_semantic_sources(user_id, courses, projects),
+        limit=5,
+    )
 
     assembler = PriorityContextAssembler(WORKSPACE_SUMMARY_CONTEXT_CHAR_LIMIT)
     assembler.add("Stable snapshot", _render_workspace_snapshot(courses, schedule_events, projects), BUDGET_FACTS)
     assembler.add("Derived facts", _render_derived_block(derived), BUDGET_FACTS)
+    assembler.add("Semantic excerpts", semantic_block, BUDGET_EXCERPTS)
     assembler.add("Timeline по учебным дедлайнам", _render_assignment_timeline(courses), BUDGET_ENTITIES)
     assembler.add("Timeline по проектным дедлайнам", _render_project_timeline(projects), BUDGET_ENTITIES)
 
@@ -1106,8 +1433,19 @@ def build_project_summary_context(db: Session, project_id: int, user_id: int) ->
 
     derived = _calc_workspace_derived([], [], [project])
     project_keywords = extract_keywords(f"{project.name} {project.description}")
+    semantic_block = _semantic_context_block(
+        db,
+        user_id=user_id,
+        query=f"{project.name} {project.description} project status risks tasks files discussion",
+        sources=_collect_project_semantic_sources(user_id, [project]),
+        scopes={"project"},
+        parent_type="project",
+        parent_id=project.id,
+        limit=6,
+    )
 
     assembler = PriorityContextAssembler(PROJECT_SUMMARY_CONTEXT_CHAR_LIMIT)
+    assembler.add("Semantic excerpts", semantic_block, BUDGET_EXCERPTS)
     assembler.add("Stable snapshot проекта", _render_project_summary(project), BUDGET_FACTS)
     assembler.add("Derived facts проекта", _render_derived_block(derived), BUDGET_FACTS)
     assembler.add("Риски по задачам", _render_task_risks(project, limit=MAX_TASKS_IN_CONTEXT), BUDGET_FACTS)
@@ -1118,10 +1456,28 @@ def build_project_summary_context(db: Session, project_id: int, user_id: int) ->
     return assembler.build("Контекст проекта для AI-сводки")
 
 
-def build_course_plan_context(course: models.Course, extra_context: str) -> str:
+def build_course_plan_context(
+    course: models.Course,
+    extra_context: str,
+    db: Session | None = None,
+    user_id: int | None = None,
+) -> str:
     keywords = extract_keywords(f"{course.name} {extra_context}")
+    semantic_block = ""
+    if db is not None and user_id is not None:
+        semantic_block = _semantic_context_block(
+            db,
+            user_id=user_id,
+            query=f"{course.name} {extra_context} course plan materials assignments",
+            sources=_collect_course_semantic_sources(user_id, [course]),
+            scopes={"course"},
+            parent_type="course",
+            parent_id=course.id,
+            limit=6,
+        )
 
     assembler = PriorityContextAssembler(COURSE_PLAN_CONTEXT_CHAR_LIMIT)
+    assembler.add("Semantic excerpts", semantic_block, BUDGET_EXCERPTS)
     assembler.add("Stable snapshot курса", _render_course_summary(course), BUDGET_FACTS)
     assembler.add("Задания курса", _render_course_assignment_briefs(course), BUDGET_ENTITIES)
 
@@ -1152,13 +1508,28 @@ def build_assignment_help_context(
     assignment: models.Assignment,
     course: models.Course | None,
     question: str = "",
+    db: Session | None = None,
+    user_id: int | None = None,
 ) -> str:
     base_text = f"{assignment.title} {assignment.description or ''} {question}"
     if course:
         base_text += f" {course.name}"
     keywords = extract_keywords(base_text)
+    semantic_block = ""
+    if db is not None and user_id is not None and course is not None:
+        semantic_block = _semantic_context_block(
+            db,
+            user_id=user_id,
+            query=base_text,
+            sources=_collect_course_semantic_sources(user_id, [course]),
+            scopes={"course"},
+            parent_type="course",
+            parent_id=course.id,
+            limit=5,
+        )
 
     assembler = PriorityContextAssembler(ASSIGNMENT_HELP_CONTEXT_CHAR_LIMIT)
+    assembler.add("Semantic excerpts", semantic_block, BUDGET_EXCERPTS)
     assembler.add("Stable snapshot задания", _render_assignment_summary(assignment, course), BUDGET_FACTS)
 
     if question.strip():
@@ -1200,11 +1571,13 @@ def _build_chat_context_text(
     projects: list[models.Project],
     derived: DerivedFacts,
     keywords: list[str],
+    semantic_block: str = "",
 ) -> str:
     assembler = PriorityContextAssembler(CHAT_CONTEXT_CHAR_LIMIT)
 
     assembler.add("Stable snapshot", _render_workspace_snapshot(courses, schedule_events, projects), BUDGET_FACTS)
     assembler.add("Derived facts", _render_derived_block(derived), BUDGET_FACTS)
+    assembler.add("Semantic excerpts", semantic_block, BUDGET_EXCERPTS)
 
     if route == _CHAT_ROUTE_COURSE:
         selected_courses = _select_relevant_courses(courses, keywords, max_items=2)
@@ -1279,12 +1652,59 @@ def build_chat_context_package(
 
     last_message = _last_user_message(normalized)
     route, route_reason = classify_chat_intent(last_message, courses, projects)
+    semantic_sources = [
+        *_collect_workspace_semantic_sources(user_id, courses, projects),
+        *_collect_chat_history_semantic_sources(user_id, normalized[:-1]),
+    ]
+
+    if last_message.strip():
+        try:
+            prune_stale_context_sources(
+                db,
+                user_id=user_id,
+                sources=semantic_sources,
+                scopes={"course", "project", "chat_history"},
+            )
+            ensure_context_sources_indexed(db, semantic_sources)
+            route_hits = semantic_search_context(
+                db,
+                user_id=user_id,
+                query=last_message,
+                scopes={"course", "project"},
+                limit=5,
+                min_score=0.14,
+            )
+            semantic_route, semantic_reason = _semantic_route_from_hits(route_hits)
+            if _should_apply_semantic_route(route, semantic_route):
+                route = semantic_route or route
+                route_reason = semantic_reason or route_reason
+        except Exception:  # pragma: no cover
+            pass
+
     route_label = CHAT_ROUTE_LABELS.get(route, CHAT_ROUTE_LABELS[_CHAT_ROUTE_STUDY_GENERAL])
 
     keywords = extract_keywords(last_message)
     derived = _calc_workspace_derived(courses, schedule_events, projects)
+    semantic_scopes = {"course", "project", "chat_history"}
+    if route in {_CHAT_ROUTE_COURSE, _CHAT_ROUTE_ASSIGNMENT}:
+        semantic_scopes = {"course", "chat_history"}
+    elif route == _CHAT_ROUTE_PROJECT:
+        semantic_scopes = {"project", "chat_history"}
+    elif route == _CHAT_ROUTE_SCHEDULE_DEADLINE:
+        semantic_scopes = {"chat_history"}
 
-    context_text = _build_chat_context_text(route, courses, schedule_events, projects, derived, keywords)
+    semantic_block = ""
+    if semantic_scopes:
+        semantic_block = _semantic_context_block(
+            db,
+            user_id=user_id,
+            query=last_message,
+            sources=semantic_sources,
+            scopes=semantic_scopes,
+            limit=6,
+        )
+
+    context_text = _build_chat_context_text(route, courses, schedule_events, projects, derived, keywords, semantic_block)
     recent_messages, older_history_summary = split_chat_history(normalized)
 
     return ChatContextPackage(

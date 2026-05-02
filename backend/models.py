@@ -310,3 +310,27 @@ class DirectMessage(Base):
 
     chat: Mapped["DirectChat"] = relationship("DirectChat", back_populates="messages")
     sender: Mapped["User"] = relationship("User", back_populates="direct_messages", foreign_keys=[sender_id])
+
+
+class AiContextChunk(Base):
+    __tablename__ = "ai_context_chunks"
+    __table_args__ = (
+        UniqueConstraint("user_id", "source_key", "chunk_index", name="uq_ai_context_chunk_source_index"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    scope: Mapped[str] = mapped_column(String(40), index=True)
+    entity_type: Mapped[str] = mapped_column(String(60), index=True)
+    entity_id: Mapped[str] = mapped_column(String(80), index=True)
+    parent_type: Mapped[str] = mapped_column(String(60), default="", index=True)
+    parent_id: Mapped[str] = mapped_column(String(80), default="", index=True)
+    source_key: Mapped[str] = mapped_column(String(220), index=True)
+    source_hash: Mapped[str] = mapped_column(String(64), index=True)
+    chunk_index: Mapped[int] = mapped_column(Integer, default=0)
+    title: Mapped[str] = mapped_column(String(400), default="")
+    text: Mapped[str] = mapped_column(Text)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+    embedding_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

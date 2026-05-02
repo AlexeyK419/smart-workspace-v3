@@ -176,7 +176,7 @@ async def generate_study_plan(
 ):
     get_course_for_user_or_404(course_id, current_user.id, db)
     course = _course_with_details_for_user(course_id, current_user.id, db)
-    context_text = build_course_plan_context(course, req.extra_context)
+    context_text = build_course_plan_context(course, req.extra_context, db=db, user_id=current_user.id)
 
     user_prompt = (
         "Составь компактный учебный план по курсу на основе фактического контекста ниже.\n"
@@ -216,7 +216,7 @@ async def assignment_help(
 ):
     assignment = get_assignment_for_user_or_404(assignment_id, current_user.id, db)
     course = _course_with_details_for_user(assignment.course_id, current_user.id, db)
-    context_text = build_assignment_help_context(assignment, course, req.question)
+    context_text = build_assignment_help_context(assignment, course, req.question, db=db, user_id=current_user.id)
 
     question_block = f"Вопрос пользователя: {req.question.strip()}\n\n" if req.question.strip() else ""
     user_prompt = (

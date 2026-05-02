@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from auth import get_course_for_user_or_404, get_current_user
+from ai_embeddings import delete_context_chunks
 from database import get_db
 import models
 import schemas
@@ -214,5 +215,6 @@ def delete_assignment(
     assignment = _get_assignment_or_404(course_id, assignment_id, db)
     if assignment.file_path and os.path.exists(assignment.file_path):
         os.remove(assignment.file_path)
+    delete_context_chunks(db, user_id=current_user.id, entity_type="assignment", entity_id=assignment.id)
     db.delete(assignment)
     db.commit()

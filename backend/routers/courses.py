@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from auth import get_course_for_user_or_404, get_current_user
+from ai_embeddings import delete_context_chunks
 from database import get_db
 import models
 import schemas
@@ -73,5 +74,6 @@ def delete_course(
     for assignment in (course.assignments or []):
         if assignment.file_path and os.path.exists(assignment.file_path):
             os.remove(assignment.file_path)
+    delete_context_chunks(db, user_id=current_user.id, parent_type="course", parent_id=course.id)
     db.delete(course)
     db.commit()
