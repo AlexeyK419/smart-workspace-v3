@@ -84,4 +84,20 @@ const store = useWorkspaceStore()
   color: var(--text-muted);
   line-height: 1.6;
 }
+
+@media (max-width: 760px) {
+  .event-row {
+    gap: 10px;
+  }
+
+  .event-time {
+    width: 48px;
+    font-size: 12px;
+  }
+
+  .event-body {
+    border-radius: 14px;
+    padding: 12px 14px;
+  }
+}
 </style>

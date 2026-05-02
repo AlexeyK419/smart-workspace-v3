@@ -78,4 +78,28 @@ const stats = computed(() => {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+@media (max-width: 760px) {
+  .stats-row {
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .stat-card {
+    min-height: 118px;
+    padding: 15px;
+    border-radius: 18px;
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--surface) 90%, transparent), color-mix(in srgb, var(--surface-2) 72%, transparent));
+  }
+
+  .stat-value {
+    font-size: 31px;
+  }
+
+  .stat-label {
+    font-size: 10.5px;
+    line-height: 1.35;
+  }
+}
 </style>

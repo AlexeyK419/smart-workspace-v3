@@ -73,4 +73,22 @@ const todayString = computed(() =>
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 760px) {
+  .page-title {
+    font-size: 30px;
+    line-height: 1.12;
+    margin-top: 4px;
+  }
+
+  .page-sub {
+    margin-bottom: 18px;
+  }
+
+  .dashboard-grid,
+  .dashboard-main,
+  .dashboard-side {
+    gap: 14px;
+  }
+}
 </style>

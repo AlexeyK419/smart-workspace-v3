@@ -110,4 +110,32 @@ function formatDate(iso) {
 .action-btn:hover { background: var(--surface-2); color: var(--accent); border-color: var(--accent-mid); }
 .action-btn svg { width: 14px; height: 14px; }
 .action-btn-danger:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
+
+@media (max-width: 760px) {
+  .files-header {
+    gap: 12px;
+  }
+
+  .upload-label {
+    padding-inline: 12px;
+  }
+
+  .file-row {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .file-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
+    font-size: 22px;
+  }
+
+  .action-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 13px;
+  }
+}
 </style>

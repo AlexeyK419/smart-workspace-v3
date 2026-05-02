@@ -36,8 +36,14 @@
           </div>
         </div>
         <div class="form-actions">
-          <button class="btn btn-ghost" @click="showEditCourse = false">Отмена</button>
-          <button class="btn btn-primary" :disabled="!editForm.name" @click="saveEditCourse">Сохранить</button>
+          <button class="btn btn-ghost" @click="showEditCourse = false">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12l4.58-4.59Z"/></svg>
+            Отмена
+          </button>
+          <button class="btn btn-primary" :disabled="!editForm.name" @click="saveEditCourse">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            Сохранить
+          </button>
         </div>
       </div>
     </Transition>
@@ -195,4 +201,40 @@ async function handleDeleteCourse() {
 .color-opt.selected, .color-opt:hover { border-color: var(--text-primary); transform: scale(1.15); }
 .form-slide-enter-active, .form-slide-leave-active { transition: all 0.25s ease; }
 .form-slide-enter-from, .form-slide-leave-to { opacity: 0; transform: translateY(-10px); }
+
+@media (max-width: 760px) {
+  .tabs {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    gap: 4px;
+    margin: 0 -2px 16px;
+    padding: 5px;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    backdrop-filter: blur(16px);
+  }
+
+  .tab {
+    min-height: 50px;
+    padding: 8px 6px;
+    border-radius: 15px;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  .edit-course-form {
+    border-radius: 22px;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .form-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
 </style>

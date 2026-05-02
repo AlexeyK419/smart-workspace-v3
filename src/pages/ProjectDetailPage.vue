@@ -62,7 +62,10 @@
               <div class="toolbar-search">
                 <input v-model.trim="taskSearch" class="input" type="text" placeholder="Поиск по задаче или описанию" />
               </div>
-              <button class="btn btn-primary" @click="openTaskCreateModal">Добавить задачу</button>
+              <button class="btn btn-primary" @click="openTaskCreateModal">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                Добавить задачу
+              </button>
             </div>
           </div>
 
@@ -145,12 +148,13 @@
     </section>
 
     <section v-else-if="activeTab === 'files'" class="card files-card">
-      <div class="card-header files-head">
-        <div>
-          <div class="card-title">Общие файлы</div>
-          <div class="section-sub">Материалы проекта доступны всем участникам команды.</div>
-        </div>
+        <div class="card-header files-head">
+          <div>
+            <div class="card-title">Общие файлы</div>
+            <div class="section-sub">Материалы проекта доступны всем участникам команды.</div>
+          </div>
         <label class="btn btn-primary upload-btn">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           Загрузить файл
           <input type="file" hidden @change="uploadSharedFile" />
         </label>
@@ -266,7 +270,10 @@
           <label class="form-label">Добавить по email</label>
           <div class="inline-row">
             <input v-model.trim="inviteEmail" class="input" type="email" placeholder="user@example.com" />
-            <button class="btn btn-primary" @click="addByEmail">Добавить</button>
+            <button class="btn btn-primary" @click="addByEmail">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              Добавить
+            </button>
           </div>
         </div>
 
@@ -364,7 +371,10 @@
         </div>
         <div class="settings-actions">
           <button class="btn btn-ghost" @click="closeTaskCreateModal">Отмена</button>
-          <button class="btn btn-primary" @click="createTask">Создать задачу</button>
+          <button class="btn btn-primary" @click="createTask">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            Создать задачу
+          </button>
         </div>
       </section>
     </div>
@@ -453,7 +463,10 @@
 
           <div class="comment-compose">
             <textarea v-model.trim="commentDraft" class="textarea" rows="3" placeholder="Например: обновил экран, осталось подключить интеграцию" />
-            <button class="btn btn-primary" @click="submitComment">Добавить комментарий</button>
+            <button class="btn btn-primary" @click="submitComment">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              Добавить комментарий
+            </button>
           </div>
         </div>
       </section>
@@ -1606,5 +1619,114 @@ select.input:focus,
     display: grid;
   }
   .message-stack { max-width: 100%; }
+}
+
+@media (max-width: 760px) {
+  .project-page {
+    gap: 14px;
+  }
+
+  .hero-copy {
+    border-radius: 24px;
+    padding: 22px;
+  }
+
+  .hero-copy h1 {
+    font-size: 31px;
+    line-height: 1.1;
+  }
+
+  .hero-copy p {
+    font-size: 13px;
+  }
+
+  .hero-edit-btn {
+    position: static;
+    width: 100%;
+    margin-bottom: 12px;
+  }
+
+  .hero-stats,
+  .hero-inline-metrics,
+  .task-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-stats div,
+  .metric-pill,
+  .kpi-box {
+    border-radius: 16px;
+  }
+
+  .tabs {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    padding: 5px;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    backdrop-filter: blur(16px);
+    overflow-x: auto;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(112px, 1fr);
+  }
+
+  .tab {
+    min-height: 48px;
+    padding: 8px 10px;
+    border-radius: 15px;
+    white-space: nowrap;
+  }
+
+  .task-toolbar,
+  .task-lane,
+  .task-tile,
+  .files-card,
+  .chat-shell,
+  .modal-window {
+    border-radius: 22px;
+  }
+
+  .kanban-board {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 4px;
+  }
+
+  .task-lane {
+    min-width: min(86vw, 340px);
+    min-height: 420px;
+    scroll-snap-align: start;
+  }
+
+  .toolbar-controls,
+  .row-2,
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-shell {
+    min-height: calc(100dvh - var(--header-h) - 132px);
+  }
+
+  .chat-thread {
+    min-height: 360px;
+    max-height: 52vh;
+    border-radius: 18px;
+  }
+
+  .message-stack {
+    max-width: min(88%, 420px);
+  }
+
+  .modal-backdrop {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .modal-window {
+    max-height: 86vh;
+  }
 }
 </style>

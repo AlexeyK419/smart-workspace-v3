@@ -509,4 +509,47 @@ function next() {
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 760px) {
+  .calendar-widget {
+    padding: 16px;
+  }
+
+  .widget-head {
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .widget-sub {
+    display: none;
+  }
+
+  .cal-month {
+    min-width: 86px;
+    font-size: 14px;
+  }
+
+  .calendar-shell,
+  .side-block {
+    border-radius: 18px;
+  }
+
+  .calendar-shell {
+    padding: 12px;
+  }
+
+  .cal-days-header,
+  .cal-grid {
+    gap: 5px;
+  }
+
+  .cal-cell {
+    min-height: 44px;
+    border-radius: 12px;
+  }
+
+  .calendar-side {
+    gap: 10px;
+  }
+}
 </style>

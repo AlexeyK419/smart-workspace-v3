@@ -48,6 +48,7 @@
         <div class="form-actions">
           <button class="btn btn-ghost" @click="cancelForm">Отмена</button>
           <button class="btn btn-primary" :disabled="!form.title || saving" @click="submitForm">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
             {{ saving ? 'Сохранение...' : (editingId ? 'Сохранить' : 'Создать') }}
           </button>
         </div>
@@ -254,4 +255,60 @@ async function remove(id) {
 .ac-btn-del:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
 .form-slide-enter-active, .form-slide-leave-active { transition: all 0.25s ease; }
 .form-slide-enter-from, .form-slide-leave-to { opacity: 0; transform: translateY(-10px); }
+
+@media (max-width: 760px) {
+  .tab-header {
+    gap: 12px;
+  }
+
+  .tab-header .btn {
+    width: 46px;
+    min-width: 46px;
+    padding: 0;
+    overflow: hidden;
+    color: transparent;
+    gap: 0;
+  }
+
+  .tab-header .btn svg {
+    color: #fff;
+  }
+
+  .add-form,
+  .assignment-card {
+    border-radius: 20px;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .form-actions,
+  .assignments-grid {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .ac-top {
+    display: grid;
+  }
+
+  .ac-footer {
+    align-items: stretch;
+  }
+
+  .ac-footer > div:last-child {
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-left: 0 !important;
+  }
+
+  .ac-btn {
+    min-height: 38px;
+    justify-content: center;
+    border-radius: 13px;
+  }
+}
 </style>

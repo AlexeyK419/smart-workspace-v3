@@ -12,7 +12,7 @@
       </div>
     </div>
 
-    <div class="messenger-shell">
+    <div class="messenger-shell" :class="{ 'conversation-open': mobileConversationOpen }">
       <aside class="dialog-panel">
         <div class="search-box">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -91,6 +91,9 @@
       <section class="conversation-panel" :class="{ empty: !selectedChat }">
         <template v-if="selectedChat">
           <header class="conversation-top">
+            <button class="mobile-chat-back" type="button" aria-label="Назад к чатам" @click="mobileConversationOpen = false">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12l4.58-4.59Z"/></svg>
+            </button>
             <div class="peer-main">
               <div class="avatar large" :style="avatarStyle(selectedChat.peer?.id)">
                 {{ selectedChat.peer?.initials || 'US' }}
@@ -191,6 +194,7 @@ const isSearching = ref(false)
 const messageDraft = ref('')
 const sending = ref(false)
 const threadRef = ref(null)
+const mobileConversationOpen = ref(false)
 
 let searchTimer = null
 let typingTimer = null
@@ -296,6 +300,7 @@ async function startChat(user) {
 
 function selectChat(chat) {
   if (!chat?.id) return
+  mobileConversationOpen.value = true
   if (chatStore.activeChatId === chat.id) {
     loadMessages(chat.id)
     return
@@ -731,6 +736,10 @@ function avatarStyle(seed = 0) {
   height: 18px;
 }
 
+.mobile-chat-back {
+  display: none;
+}
+
 .message-thread {
   min-height: 0;
   overflow: auto;
@@ -918,13 +927,70 @@ function avatarStyle(seed = 0) {
 }
 
 @media (max-width: 560px) {
+  .chats-page {
+    gap: 14px;
+  }
+
   .chats-head h1 {
-    font-size: 28px;
+    font-size: 32px;
+  }
+
+  .chats-head p {
+    margin-top: 2px;
+  }
+
+  .connection-status {
+    padding: 7px 11px;
+  }
+
+  .messenger-shell {
+    display: block;
+  }
+
+  .messenger-shell:not(.conversation-open) .conversation-panel {
+    display: none;
+  }
+
+  .messenger-shell.conversation-open .dialog-panel {
+    display: none;
   }
 
   .dialog-panel,
   .conversation-panel {
+    border-radius: 22px;
+  }
+
+  .dialog-panel {
+    max-height: none;
+    min-height: calc(100dvh - var(--header-h) - 204px);
+  }
+
+  .dialog-card,
+  .user-result {
     border-radius: 18px;
+    background: color-mix(in srgb, var(--surface-2) 62%, transparent);
+  }
+
+  .conversation-panel {
+    min-height: calc(100dvh - var(--header-h) - 124px);
+    max-height: calc(100dvh - var(--header-h) - 124px);
+  }
+
+  .mobile-chat-back {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    color: var(--text-secondary);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+
+  .mobile-chat-back svg {
+    width: 20px;
+    height: 20px;
   }
 
   .message-thread {
@@ -932,7 +998,7 @@ function avatarStyle(seed = 0) {
   }
 
   .message-stack {
-    max-width: 100%;
+    max-width: min(86%, 420px);
   }
 
   .conversation-top {

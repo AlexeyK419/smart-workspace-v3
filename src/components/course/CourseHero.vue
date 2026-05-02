@@ -146,4 +146,58 @@ defineEmits(['edit', 'delete'])
   font-weight: 700;
   color: var(--accent);
 }
+
+@media (max-width: 760px) {
+  .course-hero {
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 24px;
+    position: relative;
+  }
+
+  .course-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    font-size: 28px;
+  }
+
+  .course-hero-info {
+    min-width: 0;
+  }
+
+  .course-hero-name {
+    font-size: 28px;
+    line-height: 1.1;
+  }
+
+  .course-actions {
+    width: 100%;
+    order: 4;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .course-progress {
+    width: 100%;
+    text-align: left;
+    order: 3;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .course-progress-value {
+    float: right;
+    margin-top: -28px;
+    font-size: 30px;
+  }
+
+  .course-progress .progress-bar {
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-top: 12px;
+    height: 6px;
+  }
+}
 </style>

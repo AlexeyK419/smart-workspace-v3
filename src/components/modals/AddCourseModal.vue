@@ -33,6 +33,9 @@
       <div class="modal-footer">
         <button class="btn btn-ghost" @click="emit('close')">Отмена</button>
         <button class="btn btn-primary" :disabled="!form.name || saving" @click="submit">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+          </svg>
           {{ saving ? 'Сохранение...' : 'Добавить' }}
         </button>
       </div>

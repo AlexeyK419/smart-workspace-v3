@@ -146,6 +146,9 @@
           <div style="flex:1"></div>
           <button class="btn btn-ghost" @click="closeModal">Отмена</button>
           <button class="btn btn-primary" :disabled="!form.title || saving" @click="saveEvent">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px">
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+            </svg>
             {{ saving ? 'Сохранение...' : (editingEvent ? 'Сохранить' : 'Добавить') }}
           </button>
         </div>
@@ -541,6 +544,138 @@ function formatMinute(minute) {
   }
   .day-column {
     min-width: 150px;
+  }
+}
+
+@media (max-width: 760px) {
+  .page-header {
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .page-title {
+    font-size: 30px;
+    line-height: 1.1;
+  }
+
+  .page-sub {
+    display: none;
+  }
+
+  .page-header .btn {
+    width: 46px;
+    min-width: 46px;
+    padding: 0;
+    overflow: hidden;
+    color: transparent;
+    gap: 0;
+  }
+
+  .page-header .btn svg {
+    width: 20px !important;
+    height: 20px !important;
+    color: #fff;
+  }
+
+  .week-selector {
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .week-label {
+    min-width: 0;
+    flex: 1;
+    font-size: 14px;
+  }
+
+  .week-nav {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+  }
+
+  .schedule-grid {
+    display: grid;
+    gap: 12px;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .time-column {
+    display: none;
+  }
+
+  .day-column {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--surface) 86%, transparent);
+    box-shadow: 0 12px 30px rgba(10, 16, 28, 0.07);
+  }
+
+  .day-header {
+    height: auto;
+    min-height: 62px;
+    align-items: flex-start;
+    padding: 14px 16px;
+    background: transparent;
+  }
+
+  .day-header.today {
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--accent) 17%, transparent), transparent);
+  }
+
+  .day-name {
+    font-family: var(--font-display);
+    font-size: 18px;
+    line-height: 1.2;
+  }
+
+  .day-date {
+    font-size: 12px;
+  }
+
+  .day-slots {
+    height: auto;
+    display: grid;
+    gap: 10px;
+    padding: 0 14px 14px;
+  }
+
+  .hour-slot {
+    display: none;
+  }
+
+  .schedule-event {
+    position: static;
+    width: 100% !important;
+    min-height: 74px;
+    height: auto !important;
+    border-left-width: 4px;
+    border-radius: 16px;
+    padding: 13px 14px;
+    box-shadow: none;
+  }
+
+  .event-title {
+    font-size: 15px;
+  }
+
+  .event-time,
+  .event-teacher,
+  .event-location {
+    font-size: 12px;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
   }
 }
 </style>

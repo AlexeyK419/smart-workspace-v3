@@ -8,6 +8,8 @@
       <slot />
     </div>
   </div>
+
+  <MobileTabBar />
 </template>
 
 <script setup>
@@ -15,6 +17,7 @@ import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import Sidebar   from './Sidebar.vue'
 import AppHeader from './AppHeader.vue'
+import MobileTabBar from './MobileTabBar.vue'
 
 const route = useRoute()
 const sidebarOpen = ref(false)
@@ -63,6 +66,17 @@ watch(() => route.fullPath, closeSidebar)
 @media (max-width: 980px) {
   .content {
     padding: 20px 16px 24px;
+  }
+}
+
+@media (max-width: 760px) {
+  .main {
+    width: 100%;
+  }
+
+  .content {
+    padding: 18px 14px 106px;
+    scroll-padding-bottom: 108px;
   }
 }
 </style>

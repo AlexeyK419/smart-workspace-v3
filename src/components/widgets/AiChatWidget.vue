@@ -76,7 +76,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { onBeforeUnmount, onMounted, ref, nextTick } from 'vue'
 import { api } from '@/api/index.js'
 
 const isOpen = ref(false)
@@ -100,6 +100,22 @@ const suggestions = ref([
   'Как подступиться к лабораторной по БД?',
   'Помоги спланировать подготовку к дедлайну',
 ])
+
+function openChat() {
+  isOpen.value = true
+}
+
+function handleOpenRequest() {
+  openChat()
+}
+
+onMounted(() => {
+  window.addEventListener('workspace:open-ai-chat', handleOpenRequest)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('workspace:open-ai-chat', handleOpenRequest)
+})
 
 function now() {
   return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
@@ -408,5 +424,19 @@ function renderMd(text) {
 .icon-swap-leave-to {
   opacity: 0;
   transform: scale(0.7) rotate(25deg);
+}
+
+@media (max-width: 760px) {
+  .chat-fab {
+    display: none;
+  }
+
+  .chat-panel {
+    left: 12px;
+    right: 12px;
+    bottom: 92px;
+    width: auto;
+    height: min(72vh, 600px);
+  }
 }
 </style>

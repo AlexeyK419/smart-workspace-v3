@@ -75,8 +75,12 @@
           </label>
 
           <div class="form-actions">
-            <button class="btn btn-ghost" type="button" @click="resetProfile">Сбросить</button>
+            <button class="btn btn-ghost" type="button" @click="resetProfile">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5v2a5 5 0 1 1-4.9 6H5a7 7 0 1 0 7-8z"/></svg>
+              Сбросить
+            </button>
             <button class="btn btn-primary" type="submit" :disabled="profileSaving || !profileForm.name">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
               {{ profileSaving ? 'Сохраняем…' : 'Сохранить имя' }}
             </button>
           </div>
@@ -108,8 +112,12 @@
           </label>
 
           <div class="form-actions full-span">
-            <button class="btn btn-ghost" type="button" @click="resetPassword">Очистить</button>
+            <button class="btn btn-ghost" type="button" @click="resetPassword">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6zM9 9h6v6H9z"/></svg>
+              Очистить
+            </button>
             <button class="btn btn-primary" type="submit" :disabled="passwordSaving">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
               {{ passwordSaving ? 'Обновляем…' : 'Изменить пароль' }}
             </button>
           </div>

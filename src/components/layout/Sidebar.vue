@@ -118,6 +118,23 @@
       </RouterLink>
     </nav>
 
+    <div class="sidebar-mobile-actions">
+      <button class="mobile-action ai-action" type="button" @click="openAiChat">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2 9.2 8.2 3 11l6.2 2.8L12 20l2.8-6.2L21 11l-6.2-2.8L12 2Zm7 10.5-1.8 4-4 1.8 4-1.8 1.8-4Z"/>
+        </svg>
+        Ассистент
+      </button>
+      <RouterLink to="/settings" class="mobile-action profile-action" @click="emitClose">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 20V4"/>
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M5 5h14v14H5z"/>
+        </svg>
+        Настройки
+      </RouterLink>
+    </div>
+
     <div class="sidebar-profile">
       <div class="avatar">{{ store.currentUser.initials }}</div>
       <div class="profile-info">
@@ -227,6 +244,13 @@ function emitClose() {
 
 function openProjectModal() {
   projectModalOpen.value = true
+}
+
+function openAiChat() {
+  emitClose()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('workspace:open-ai-chat'))
+  }
 }
 
 function closeProjectModal() {
@@ -542,6 +566,10 @@ async function logout() {
   border-color: var(--text-primary);
 }
 
+.sidebar-mobile-actions {
+  display: none;
+}
+
 @media (max-width: 980px) {
   .sidebar {
     position: fixed;
@@ -563,5 +591,52 @@ async function logout() {
     display: inline-flex;
   }
 
+  .sidebar-logo {
+    padding-top: 18px;
+  }
+
+  .sidebar-nav {
+    display: none;
+  }
+
+  .sidebar-profile {
+    display: none;
+  }
+
+  .sidebar-mobile-actions {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    margin-top: 6px;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .mobile-action {
+    width: 100%;
+    min-height: 46px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 76%, transparent);
+    color: var(--text-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .mobile-action svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .ai-action {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  }
 }
 </style>
