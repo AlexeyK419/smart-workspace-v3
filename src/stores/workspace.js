@@ -1,11 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { api } from '@/api/index.js'
 import { useAuthStore } from '@/stores/auth'
 import { parseRuDate, formatTimeFromMinutes, currentDayIndex } from '@/utils/dates'
-
-const AI_CACHE_STORAGE_KEY = 'workspace_ai_summary_cache_v1'
-const AI_CONTEXT_VERSION_SALT = 'ai_ctx_v2'
 
 function normalizeScheduleEvent(event) {
   const startMinute = Number(event.start_minute)
@@ -65,94 +62,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const projects = ref([])
   const isLoading = ref(false)
   const toast = ref('')
-  const workspaceHydrated = ref(false)
-  const aiWorkspaceSummaryCache = ref({ summary: '', contextKey: '' })
-  const aiProjectSummaryCache = ref({})
-
-  function hashContextKey(value) {
-    const input = String(value || '')
-    let hash = 5381
-    for (let i = 0; i < input.length; i += 1) {
-      hash = ((hash << 5) + hash) ^ input.charCodeAt(i)
-      hash = hash >>> 0
-    }
-    return hash.toString(36)
-  }
-
-  function getCacheUserId() {
-    return authStore.currentUser?.id ? String(authStore.currentUser.id) : ''
-  }
-
-  function readAiCacheStorage() {
-    if (typeof window === 'undefined') return { users: {} }
-    try {
-      const parsed = JSON.parse(localStorage.getItem(AI_CACHE_STORAGE_KEY) || '{}')
-      if (parsed && typeof parsed === 'object') {
-        return { users: parsed.users && typeof parsed.users === 'object' ? parsed.users : {} }
-      }
-    } catch {
-      // ignore broken cache payload
-    }
-    return { users: {} }
-  }
-
-  function writeAiCacheStorage(payload) {
-    if (typeof window === 'undefined') return
-    try {
-      localStorage.setItem(AI_CACHE_STORAGE_KEY, JSON.stringify(payload))
-    } catch {
-      // ignore quota / storage errors
-    }
-  }
-
-  function loadAiCacheForCurrentUser() {
-    const userId = getCacheUserId()
-    if (!userId) {
-      aiWorkspaceSummaryCache.value = { summary: '', contextKey: '' }
-      aiProjectSummaryCache.value = {}
-      return
-    }
-
-    const payload = readAiCacheStorage()
-    const userCache = payload.users[userId] || {}
-    const workspaceCache = userCache.workspace || {}
-
-    aiWorkspaceSummaryCache.value = {
-      summary: workspaceCache.summary || '',
-      contextKey: workspaceCache.contextKey || '',
-    }
-
-    aiProjectSummaryCache.value = userCache.projects && typeof userCache.projects === 'object'
-      ? userCache.projects
-      : {}
-  }
-
-  function persistAiCacheForCurrentUser() {
-    const userId = getCacheUserId()
-    if (!userId) return
-
-    const payload = readAiCacheStorage()
-    const users = payload.users || {}
-
-    users[userId] = {
-      workspace: {
-        summary: aiWorkspaceSummaryCache.value.summary || '',
-        contextKey: aiWorkspaceSummaryCache.value.contextKey || '',
-      },
-      projects: aiProjectSummaryCache.value,
-    }
-
-    const userIds = Object.keys(users)
-    if (userIds.length > 5) {
-      userIds.sort((a, b) => Number(b) - Number(a))
-      const trimmed = {}
-      userIds.slice(0, 5).forEach((id) => { trimmed[id] = users[id] })
-      writeAiCacheStorage({ users: trimmed })
-      return
-    }
-
-    writeAiCacheStorage({ users })
-  }
 
   const currentUser = computed(() => authStore.currentUser || {
     id: null,
@@ -286,156 +195,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     projectTasks.value.filter((task) => task.status !== 'done')
   )
 
-  function normalizeDateForKey(value) {
-    if (!value) return ''
-    const date = value instanceof Date ? value : new Date(value)
-    if (!Number.isNaN(date?.getTime?.())) return date.toISOString()
-    return String(value)
-  }
-
-  function buildWorkspaceAiContextKey() {
-    const coursePart = [...courses.value]
-      .map((course) => {
-        const materialsPart = [...(course.materials || [])]
-          .map((material) => `${material.id}|${material.name}|${material.size_bytes}|${material.mime_type}`)
-          .sort()
-          .join('~')
-
-        const assignmentsPart = [...(course.assignments || [])]
-          .map((assignment) => [
-            assignment.id,
-            assignment.title || '',
-            assignment.description || '',
-            assignment.status || '',
-            assignment.deadline || '',
-            normalizeDateForKey(assignment.deadline_dt),
-            assignment.file_name || '',
-          ].join('|'))
-          .sort()
-          .join('~')
-
-        return [
-          course.id,
-          course.name || '',
-          course.teacher || '',
-          course.semester || '',
-          course.progress ?? '',
-          materialsPart,
-          assignmentsPart,
-        ].join('||')
-      })
-      .sort()
-      .join('@@')
-
-    const schedulePart = [...scheduleEvents.value]
-      .map((event) => [
-        event.id,
-        event.title || '',
-        event.dayIndex,
-        event.startMinute,
-        event.durationMinutes,
-        event.location || '',
-        event.teacher || '',
-        event.type || '',
-        event.color || '',
-      ].join('|'))
-      .sort()
-      .join('@@')
-
-    const projectPart = [...projects.value]
-      .map((project) => {
-        const membersPart = [...(project.members || [])]
-          .map((member) => `${member.id}|${member.user_id}|${member.role}|${member.user?.name || ''}`)
-          .sort()
-          .join('~')
-
-        const tasksPart = [...(project.tasks || [])]
-          .map((task) => {
-            const commentsPart = [...(task.comments || [])]
-              .map((comment) => `${comment.id}|${comment.author_id}|${comment.body || ''}`)
-              .sort()
-              .join('^')
-            return [
-              task.id,
-              task.title || '',
-              task.description || '',
-              task.status || '',
-              normalizeDateForKey(task.due_date || task.dueDate),
-              task.assignee_id ?? '',
-              commentsPart,
-            ].join('|')
-          })
-          .sort()
-          .join('~')
-
-        const filesPart = [...(project.files || [])]
-          .map((file) => `${file.id}|${file.name}|${file.size_bytes}|${file.mime_type}`)
-          .sort()
-          .join('~')
-
-        return [
-          project.id,
-          project.name || '',
-          project.description || '',
-          project.color || '',
-          membersPart,
-          tasksPart,
-          filesPart,
-        ].join('||')
-      })
-      .sort()
-      .join('@@')
-
-    return [AI_CONTEXT_VERSION_SALT, coursePart, schedulePart, projectPart].join('###')
-  }
-
-  const workspaceAiContextKey = computed(() => buildWorkspaceAiContextKey())
-
-  function getProjectAiContextKey(projectId) {
-    const project = projects.value.find((item) => item.id === Number(projectId))
-    if (!project) return `project:${projectId}:missing`
-
-    const membersPart = [...(project.members || [])]
-      .map((member) => `${member.id}|${member.user_id}|${member.role}|${member.user?.name || ''}`)
-      .sort()
-      .join('~')
-
-    const tasksPart = [...(project.tasks || [])]
-      .map((task) => {
-        const commentsPart = [...(task.comments || [])]
-          .map((comment) => `${comment.id}|${comment.author_id}|${comment.body || ''}`)
-          .sort()
-          .join('^')
-        return [
-          task.id,
-          task.title || '',
-          task.description || '',
-          task.status || '',
-          normalizeDateForKey(task.due_date || task.dueDate),
-          task.assignee_id ?? '',
-          commentsPart,
-        ].join('|')
-      })
-      .sort()
-      .join('~')
-
-    const filesPart = [...(project.files || [])]
-      .map((file) => `${file.id}|${file.name}|${file.size_bytes}|${file.mime_type}`)
-      .sort()
-      .join('~')
-
-    return [
-      AI_CONTEXT_VERSION_SALT,
-      project.id,
-      project.name || '',
-      project.description || '',
-      project.color || '',
-      membersPart,
-      tasksPart,
-      filesPart,
-    ].join('###')
-  }
-
   function replaceProject(project) {
     const normalized = normalizeProject(project)
     const idx = projects.value.findIndex((item) => item.id === normalized.id)
@@ -449,13 +208,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     courses.value = []
     scheduleEvents.value = []
     projects.value = []
-    workspaceHydrated.value = false
-    aiWorkspaceSummaryCache.value = { summary: '', contextKey: '' }
-    aiProjectSummaryCache.value = {}
-  }
-
-  function markWorkspaceHydrated(value = true) {
-    workspaceHydrated.value = Boolean(value)
   }
 
   async function fetchCourses() {
@@ -836,51 +588,17 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
-  async function fetchAiWorkspaceSummary(options = {}) {
-    const force = Boolean(options.force)
-    const contextKey = workspaceAiContextKey.value
-    const contextHash = hashContextKey(contextKey)
-    const cache = aiWorkspaceSummaryCache.value
-
-    if (!force && cache.summary && cache.contextKey === contextHash) {
-      return { summary: cache.summary, cached: true, contextKey }
-    }
-
+  async function fetchAiWorkspaceSummary() {
     const res = await api.aiWorkspaceSummary()
     const summary = (res?.summary || '').trim()
-    aiWorkspaceSummaryCache.value = { summary, contextKey: contextHash }
-    persistAiCacheForCurrentUser()
-    return { summary, cached: false, contextKey }
+    return { summary, cached: false }
   }
 
-  async function fetchAiProjectSummary(projectId, options = {}) {
-    const force = Boolean(options.force)
-    const contextKey = getProjectAiContextKey(projectId)
-    const contextHash = hashContextKey(contextKey)
-    const key = String(projectId)
-    const cache = aiProjectSummaryCache.value[key]
-
-    if (!force && cache?.summary && cache.contextKey === contextHash) {
-      return { summary: cache.summary, cached: true, contextKey }
-    }
-
+  async function fetchAiProjectSummary(projectId) {
     const res = await api.aiProjectSummary(projectId)
     const summary = (res?.summary || '').trim()
-    aiProjectSummaryCache.value = {
-      ...aiProjectSummaryCache.value,
-      [key]: { summary, contextKey: contextHash },
-    }
-    persistAiCacheForCurrentUser()
-    return { summary, cached: false, contextKey }
+    return { summary, cached: false }
   }
-
-  watch(
-    () => authStore.currentUser?.id,
-    () => {
-      loadAiCacheForCurrentUser()
-    },
-    { immediate: true }
-  )
 
   function showToast(message) {
     toast.value = message
@@ -919,8 +637,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     projects,
     isLoading,
     toast,
-    workspaceHydrated,
-    workspaceAiContextKey,
     allAssignments,
     allDeadlines,
     todayEvents,
@@ -931,7 +647,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     fetchSchedule,
     fetchProjects,
     fetchProject,
-    markWorkspaceHydrated,
     resetWorkspace,
     addCourse,
     updateCourse,
@@ -961,7 +676,6 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     postProjectMessage,
     fetchAiWorkspaceSummary,
     fetchAiProjectSummary,
-    getProjectAiContextKey,
     showToast,
     statusLabel,
     projectTaskStatusLabel,

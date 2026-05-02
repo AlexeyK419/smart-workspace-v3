@@ -9,10 +9,10 @@
     :error="error"
     loading-text="Ассистент анализирует проект"
     empty-title="Сводка проекта пока недоступна"
-    empty-text="Обновите AI-сводку, чтобы увидеть состояние проекта и следующие действия."
+    empty-text="Нажмите «Обновить», чтобы сформировать AI-сводку проекта."
   >
     <template #actions>
-      <button class="btn btn-ghost ai-refresh" :disabled="isLoading" @click="fetchSummary(true)">
+      <button class="btn btn-ghost ai-refresh" :disabled="isLoading" @click="fetchSummary">
         <svg viewBox="0 0 24 24" fill="none">
           <path d="M20 12a8 8 0 0 1-14.9 4M4 12A8 8 0 0 1 18.9 8M19 4v4h-4M5 20v-4h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import AiRecommendationCard from '@/components/ai/AiRecommendationCard.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 
@@ -36,12 +36,12 @@ const isLoading = ref(false)
 const error = ref('')
 const summary = ref('')
 
-async function fetchSummary(force = false) {
+async function fetchSummary() {
   if (!props.projectId) return
   isLoading.value = true
   error.value = ''
   try {
-    const res = await store.fetchAiProjectSummary(props.projectId, { force })
+    const res = await store.fetchAiProjectSummary(props.projectId)
     summary.value = (res?.summary || '').trim()
   } catch (e) {
     error.value = e.message
@@ -49,14 +49,6 @@ async function fetchSummary(force = false) {
     isLoading.value = false
   }
 }
-
-watch(
-  () => [props.projectId, store.getProjectAiContextKey(props.projectId)],
-  () => {
-    fetchSummary(false)
-  },
-  { immediate: true }
-)
 </script>
 
 <style scoped>
