@@ -58,11 +58,6 @@
           <path d="M21.64 13A9 9 0 0 1 11 2.36 7 7 0 1 0 21.64 13Z"/>
         </svg>
       </button>
-      <button class="header-btn" title="Поиск" @click="store.showToast('Поиск в разработке')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-        </svg>
-      </button>
     </div>
   </header>
 </template>

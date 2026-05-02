@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import AiRecommendationCard from '@/components/ai/AiRecommendationCard.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 
@@ -35,6 +35,14 @@ const store = useWorkspaceStore()
 const isLoading = ref(false)
 const error = ref('')
 const summary = ref('')
+
+watch(
+  () => store.projects.find((item) => item.id === props.projectId)?.ai_summary,
+  (value) => {
+    summary.value = value || ''
+  },
+  { immediate: true }
+)
 
 async function fetchSummary() {
   if (!props.projectId) return

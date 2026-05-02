@@ -23,14 +23,22 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import AiRecommendationCard from '@/components/ai/AiRecommendationCard.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 
 const store = useWorkspaceStore()
 const isLoading = ref(false)
 const error = ref('')
-const summary = ref('')
+const summary = ref(store.currentUser?.workspace_ai_summary || '')
+
+watch(
+  () => store.currentUser?.workspace_ai_summary,
+  (value) => {
+    summary.value = value || ''
+  },
+  { immediate: true }
+)
 
 async function fetchSummary() {
   isLoading.value = true

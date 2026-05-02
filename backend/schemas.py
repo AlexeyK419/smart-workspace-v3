@@ -8,6 +8,7 @@ class UserOut(BaseModel):
     initials: str
     role: str
     email: str | None = None
+    workspace_ai_summary: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -300,6 +301,7 @@ class ProjectOut(BaseModel):
     description: str
     color: str
     created_at: datetime
+    ai_summary: str | None = None
     owner: UserOut | None = None
     members: list[ProjectMemberOut] = Field(default_factory=list)
     tasks: list[ProjectTaskOut] = Field(default_factory=list)

@@ -591,12 +591,25 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   async function fetchAiWorkspaceSummary() {
     const res = await api.aiWorkspaceSummary()
     const summary = (res?.summary || '').trim()
+    if (authStore.currentUser) {
+      authStore.currentUser = {
+        ...authStore.currentUser,
+        workspace_ai_summary: summary,
+      }
+    }
     return { summary, cached: false }
   }
 
   async function fetchAiProjectSummary(projectId) {
     const res = await api.aiProjectSummary(projectId)
     const summary = (res?.summary || '').trim()
+    const projectIndex = projects.value.findIndex((item) => item.id === Number(projectId))
+    if (projectIndex !== -1) {
+      projects.value[projectIndex] = {
+        ...projects.value[projectIndex],
+        ai_summary: summary,
+      }
+    }
     return { summary, cached: false }
   }
 

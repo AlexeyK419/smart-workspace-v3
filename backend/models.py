@@ -15,6 +15,7 @@ class User(Base):
     password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     password_salt: Mapped[str | None] = mapped_column(String(64), nullable=True)
     auth_token:    Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    workspace_ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
     courses: Mapped[list["Course"]] = relationship("Course", back_populates="user", cascade="all, delete-orphan")
     schedule_events: Mapped[list["ScheduleEvent"]] = relationship(
@@ -160,6 +161,7 @@ class Project(Base):
     description: Mapped[str]      = mapped_column(Text, default="")
     color:       Mapped[str]      = mapped_column(String(20), default="#3d52d5")
     created_at:  Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    ai_summary:  Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
 
     owner: Mapped["User"] = relationship("User", back_populates="owned_projects", foreign_keys=[owner_id])
     members: Mapped[list["ProjectMember"]] = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")

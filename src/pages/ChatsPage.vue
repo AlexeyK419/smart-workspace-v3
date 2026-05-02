@@ -692,6 +692,7 @@ function avatarStyle(seed = 0) {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
+  margin-right: clamp(72px, 5vw, 96px);
 }
 
 .conversation-panel.empty {
@@ -915,6 +916,10 @@ function avatarStyle(seed = 0) {
 
   .messenger-shell {
     grid-template-columns: 1fr;
+  }
+
+  .conversation-panel {
+    margin-right: 0;
   }
 
   .dialog-panel {

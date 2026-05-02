@@ -20,6 +20,7 @@ from auth import (
     get_assignment_for_user_or_404,
     get_course_for_user_or_404,
     get_current_user,
+    get_project_for_user_or_404,
 )
 from database import get_db
 from llm_provider import Message, chat_complete, list_models
@@ -280,6 +281,8 @@ async def workspace_summary(
         logger.exception("AI workspace summary error")
         raise HTTPException(502, f"Ошибка AI-сервиса: {exc}") from exc
 
+    current_user.workspace_ai_summary = summary
+    db.commit()
     return SummaryResponse(summary=summary)
 
 
@@ -289,6 +292,7 @@ async def project_summary(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    project = get_project_for_user_or_404(project_id, current_user.id, db)
     context_text = build_project_context(db, project_id, current_user.id)
     if context_text is None:
         raise HTTPException(status_code=404, detail="Проект не найден")
@@ -318,6 +322,8 @@ async def project_summary(
         logger.exception("AI project summary error")
         raise HTTPException(502, f"Ошибка AI-сервиса: {exc}") from exc
 
+    project.ai_summary = summary
+    db.commit()
     return SummaryResponse(summary=summary)
 
 
