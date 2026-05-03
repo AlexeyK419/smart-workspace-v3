@@ -62,7 +62,7 @@
               <div class="toolbar-search">
                 <input v-model.trim="taskSearch" class="input" type="text" placeholder="Поиск по задаче или описанию" />
               </div>
-              <button class="btn btn-primary" @click="openTaskCreateModal">
+              <button class="btn btn-primary mobile-plus-btn" @click="openTaskCreateModal">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                 Добавить задачу
               </button>
@@ -153,7 +153,7 @@
             <div class="card-title">Общие файлы</div>
             <div class="section-sub">Материалы проекта доступны всем участникам команды.</div>
           </div>
-        <label class="btn btn-primary upload-btn">
+        <label class="btn btn-primary upload-btn mobile-plus-btn">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           Загрузить файл
           <input type="file" hidden @change="uploadSharedFile" />
@@ -270,7 +270,7 @@
           <label class="form-label">Добавить по email</label>
           <div class="inline-row">
             <input v-model.trim="inviteEmail" class="input" type="email" placeholder="user@example.com" />
-            <button class="btn btn-primary" @click="addByEmail">
+            <button class="btn btn-primary mobile-plus-btn" @click="addByEmail">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
               Добавить
             </button>
@@ -371,7 +371,7 @@
         </div>
         <div class="settings-actions">
           <button class="btn btn-ghost" @click="closeTaskCreateModal">Отмена</button>
-          <button class="btn btn-primary" @click="createTask">
+          <button class="btn btn-primary mobile-plus-btn" @click="createTask">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
             Создать задачу
           </button>
@@ -463,7 +463,7 @@
 
           <div class="comment-compose">
             <textarea v-model.trim="commentDraft" class="textarea" rows="3" placeholder="Например: обновил экран, осталось подключить интеграцию" />
-            <button class="btn btn-primary" @click="submitComment">
+            <button class="btn btn-primary mobile-plus-btn" @click="submitComment">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
               Добавить комментарий
             </button>
@@ -1704,6 +1704,22 @@ select.input:focus,
   .row-2,
   .detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .mobile-plus-btn {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .mobile-plus-btn svg {
+    display: none;
+  }
+
+  .mobile-plus-btn::before {
+    content: "+";
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
   }
 
   .chat-shell {

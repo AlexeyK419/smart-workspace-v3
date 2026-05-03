@@ -19,7 +19,10 @@
       <div class="chat-messages" ref="messagesEl">
         <div v-for="msg in messages" :key="msg.id" class="msg" :class="msg.role">
           <div class="msg-avatar" :class="msg.role === 'assistant' ? 'ai-av' : 'user-av'">
-            {{ msg.role === 'assistant' ? 'AI' : 'Вы' }}
+            <svg v-if="msg.role !== 'assistant'" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5Zm0 2c-4.42 0-8 2.79-8 6.25V21h16v-.75C20 16.79 16.42 14 12 14Z"/>
+            </svg>
+            <span v-else>AI</span>
           </div>
           <div>
             <div class="msg-bubble" v-html="renderMd(msg.content)"></div>
@@ -309,8 +312,13 @@ function renderMd(text) {
   color: var(--accent);
 }
 .user-av {
-  background: var(--text-primary);
-  color: white;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
+.msg-avatar svg {
+  width: 14px;
+  height: 14px;
 }
 .msg-time {
   font-size: 10px;

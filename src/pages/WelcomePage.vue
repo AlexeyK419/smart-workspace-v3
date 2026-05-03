@@ -55,10 +55,6 @@
 
         <div v-if="error" class="auth-error">{{ error }}</div>
         <button class="auth-submit" :disabled="submitting">Войти</button>
-
-        <div class="auth-hint">
-          Для теста доступен demo-аккаунт: <strong>demo@workspace.local</strong> / <strong>workspace123</strong>
-        </div>
       </form>
 
       <form v-else class="auth-form" @submit.prevent="submitRegister">
