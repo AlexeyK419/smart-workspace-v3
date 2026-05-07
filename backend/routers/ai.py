@@ -115,7 +115,7 @@ def _course_with_details_for_user(course_id: int, user_id: int, db: Session) -> 
         db.query(models.Course)
         .options(
             selectinload(models.Course.materials),
-            selectinload(models.Course.assignments),
+            selectinload(models.Course.assignments).selectinload(models.Assignment.files),
         )
         .filter(models.Course.id == course_id, models.Course.user_id == user_id)
         .first()

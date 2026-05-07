@@ -45,6 +45,8 @@ export async function fetchBlobUrl(path) {
 export function getDownloadPath(entityType, courseId, projectId, fileId) {
   if (entityType === 'material') return `/courses/${courseId}/materials/${fileId}/download`
   if (entityType === 'assignment') return `/courses/${courseId}/assignments/${fileId}/download`
+  if (entityType === 'assignmentFile' || entityType === 'assignment_file')
+    return `/courses/${courseId}/assignments/${projectId}/files/${fileId}/download`
   if (entityType === 'projectFile') return `/projects/${projectId}/files/${fileId}/download`
   return null
 }
@@ -156,6 +158,18 @@ export const api = {
   deleteAssignment:     (courseId, id)       => request('DELETE', `/courses/${courseId}/assignments/${id}`),
   downloadAssignment:   (courseId, id, fileName = 'assignment') => downloadWithAuth(`/courses/${courseId}/assignments/${id}/download`, fileName),
   previewAssignment:    (courseId, id) => request('GET', `/courses/${courseId}/assignments/${id}/preview`),
+
+  uploadAssignmentFile: (courseId, assignmentId, file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request('POST', `/courses/${courseId}/assignments/${assignmentId}/files`, fd)
+  },
+  downloadAssignmentFile: (courseId, assignmentId, fileId, fileName = 'file') =>
+    downloadWithAuth(`/courses/${courseId}/assignments/${assignmentId}/files/${fileId}/download`, fileName),
+  previewAssignmentFile: (courseId, assignmentId, fileId) =>
+    request('GET', `/courses/${courseId}/assignments/${assignmentId}/files/${fileId}/preview`),
+  deleteAssignmentFile:  (courseId, assignmentId, fileId) =>
+    request('DELETE', `/courses/${courseId}/assignments/${assignmentId}/files/${fileId}`),
 
   getSchedule:    ()         => request('GET',    '/schedule/'),
   createSchedule: (data)     => request('POST',   '/schedule/', data),

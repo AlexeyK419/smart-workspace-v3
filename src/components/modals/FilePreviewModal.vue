@@ -89,6 +89,8 @@ onMounted(async () => {
         data = await api.previewMaterial(props.file.courseId, props.file.id)
       } else if (props.file.entityType === 'assignment') {
         data = await api.previewAssignment(props.file.courseId, props.file.id)
+      } else if (props.file.entityType === 'assignmentFile') {
+        data = await api.previewAssignmentFile(props.file.courseId, props.file.projectId, props.file.id)
       } else if (props.file.entityType === 'projectFile') {
         data = await api.previewProjectFile(props.file.projectId, props.file.id)
       }
@@ -123,6 +125,7 @@ async function fetchAndConvertDocx(downloadPath) {
 </script>
 
 <style scoped>
+.modal-overlay { z-index: 200; }
 .file-icon {
   width: 32px; height: 32px; border-radius: 8px;
   display: flex; align-items: center; justify-content: center; font-size: 14px;

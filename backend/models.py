@@ -132,6 +132,23 @@ class Assignment(Base):
     created_at:  Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow)
 
     course: Mapped["Course"] = relationship("Course", back_populates="assignments")
+    files: Mapped[list["AssignmentFile"]] = relationship("AssignmentFile", back_populates="assignment", cascade="all, delete-orphan")
+
+
+class AssignmentFile(Base):
+    __tablename__ = "assignment_files"
+
+    id:            Mapped[int]      = mapped_column(Integer, primary_key=True, index=True)
+    assignment_id: Mapped[int]      = mapped_column(Integer, ForeignKey("assignments.id"))
+    name:          Mapped[str]      = mapped_column(String(300))
+    file_path:     Mapped[str]      = mapped_column(String(500))
+    size_bytes:    Mapped[int]      = mapped_column(Integer, default=0)
+    mime_type:     Mapped[str]      = mapped_column(String(100), default="")
+    icon:          Mapped[str]      = mapped_column(String(10), default="📄")
+    icon_bg:       Mapped[str]      = mapped_column(String(20), default="#fee2e2")
+    created_at:    Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    assignment: Mapped["Assignment"] = relationship("Assignment", back_populates="files")
 
 
 class ScheduleEvent(Base):

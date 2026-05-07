@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from database import get_db
 import models
@@ -86,6 +86,7 @@ def get_course_for_user_or_404(course_id: int, user_id: int, db: Session) -> mod
 def get_assignment_for_user_or_404(assignment_id: int, user_id: int, db: Session) -> models.Assignment:
     assignment = (
         db.query(models.Assignment)
+        .options(selectinload(models.Assignment.files))
         .join(models.Course, models.Course.id == models.Assignment.course_id)
         .filter(models.Assignment.id == assignment_id, models.Course.user_id == user_id)
         .first()

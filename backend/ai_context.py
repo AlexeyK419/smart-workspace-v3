@@ -405,7 +405,14 @@ def _collect_course_semantic_sources(user_id: int, courses: list[models.Course])
             )
 
         for assignment in course.assignments or []:
-            file_text = _file_text_for_index(assignment.file_path)
+            file_parts: list[str] = []
+            for af in assignment.files or []:
+                file_text = _file_text_for_index(af.file_path)
+                if file_text:
+                    file_parts.append(f"Файл «{af.name}»:\n{file_text}")
+            legacy_text = ""
+            if assignment.file_path and not assignment.files:
+                legacy_text = _file_text_for_index(assignment.file_path)
             text = "\n".join(
                 part
                 for part in [
@@ -415,7 +422,8 @@ def _collect_course_semantic_sources(user_id: int, courses: list[models.Course])
                     f"Deadline: {assignment.deadline or _fmt_dt(assignment.deadline_dt)}",
                     f"Description: {assignment.description or ''}",
                     f"Attached file: {assignment.file_name or ''}",
-                    file_text,
+                    legacy_text,
+                    "\n\n".join(file_parts),
                 ]
                 if part.strip()
             )
@@ -439,6 +447,31 @@ def _collect_course_semantic_sources(user_id: int, courses: list[models.Course])
                     },
                 )
             )
+
+            for af in assignment.files or []:
+                file_text = _file_text_for_index(af.file_path)
+                if not file_text:
+                    continue
+                sources.append(
+                    ContextSource(
+                        user_id=user_id,
+                        scope="course",
+                        entity_type="assignment_file",
+                        entity_id=af.id,
+                        parent_type="assignment",
+                        parent_id=assignment.id,
+                        title=f"Файл задания «{af.name}» / «{assignment.title}» / «{course.name}»",
+                        text=file_text,
+                        metadata={
+                            "course_id": course.id,
+                            "course_name": course.name,
+                            "assignment_id": assignment.id,
+                            "assignment_title": assignment.title,
+                            "file_id": af.id,
+                            "file_name": af.name,
+                        },
+                    )
+                )
     return sources
 
 
@@ -601,7 +634,10 @@ def _semantic_context_block(
 def _course_query(db: Session, user_id: int):
     return (
         db.query(models.Course)
-        .options(selectinload(models.Course.materials), selectinload(models.Course.assignments))
+        .options(
+            selectinload(models.Course.materials),
+            selectinload(models.Course.assignments).selectinload(models.Assignment.files),
+        )
         .filter(models.Course.user_id == user_id)
         .order_by(models.Course.id.asc())
     )
@@ -694,7 +730,7 @@ def _calc_workspace_derived(
                 upcoming.append((assignment.deadline_dt, label))
                 conflicts_map[assignment.deadline_dt.date().isoformat()].append(label)
 
-            if assignment.status != "done" and not (assignment.description or "").strip() and not assignment.file_path:
+            if assignment.status != "done" and not (assignment.description or "").strip() and not (assignment.files or []) and not assignment.file_path:
                 blockers.append(
                     f"Курс «{course.name}», задание «{assignment.title}»: мало входных данных (нет описания и файла)."
                 )
@@ -864,7 +900,12 @@ def _render_assignment_summary(assignment: models.Assignment, course: models.Cou
         f"Дедлайн: {assignment.deadline or _fmt_dt(assignment.deadline_dt)}",
         f"Описание: {_clip(assignment.description or '—', 800)}",
     ]
-    if assignment.file_name:
+    file_names: list[str] = []
+    for af in assignment.files or []:
+        file_names.append(af.name)
+    if file_names:
+        lines.append(f"Файлы задания ({len(file_names)}): {', '.join(file_names)}")
+    elif assignment.file_name:
         lines.append(f"Файл задания: {assignment.file_name}")
     return "\n".join(lines)
 
@@ -1103,13 +1144,25 @@ def _course_material_excerpts(course: models.Course, keywords: list[str], *, max
 
 
 def _assignment_file_excerpt(assignment: models.Assignment, keywords: list[str]) -> str:
-    if not assignment.file_path:
-        return "- Файл задания не прикреплен."
+    lines: list[str] = []
 
-    excerpt, state = extract_file_excerpt(assignment.file_path, keywords, max_chars=850)
-    if not excerpt:
-        return f"- Файл задания: {state}."
-    return f"- Файл задания «{assignment.file_name or assignment.title}»:\n{excerpt}"
+    for af in assignment.files or []:
+        excerpt, state = extract_file_excerpt(af.file_path, keywords, max_chars=850)
+        if excerpt:
+            lines.append(f"- Файл задания «{af.name}»:\n{excerpt}")
+        else:
+            lines.append(f"- Файл задания «{af.name}»: {state}.")
+
+    if not lines and assignment.file_path:
+        excerpt, state = extract_file_excerpt(assignment.file_path, keywords, max_chars=850)
+        if not excerpt:
+            return f"- Файл задания: {state}."
+        return f"- Файл задания «{assignment.file_name or assignment.title}»:\n{excerpt}"
+
+    if not lines:
+        return "- Файлы задания не прикреплены."
+
+    return "\n\n".join(lines)
 
 
 def _project_file_excerpts(project: models.Project, keywords: list[str], *, max_items: int = 2) -> str:
@@ -1413,8 +1466,9 @@ def build_course_plan_context(
 
     assignment_file_lines: list[str] = []
     for assignment in (course.assignments or [])[:MAX_ASSIGNMENTS_IN_CONTEXT]:
-        if assignment.file_path:
-            assignment_file_lines.append(f"- «{assignment.title}»\n{_assignment_file_excerpt(assignment, keywords)}")
+        excerpt = _assignment_file_excerpt(assignment, keywords)
+        if excerpt and excerpt != "- Файлы задания не прикреплены.":
+            assignment_file_lines.append(f"- «{assignment.title}»\n{excerpt}")
 
     if assignment_file_lines:
         assembler.add("Excerpts из файлов заданий", "\n".join(assignment_file_lines), BUDGET_EXCERPTS)
@@ -1466,7 +1520,7 @@ def build_assignment_help_context(
             BUDGET_FACTS,
         )
 
-    assembler.add("Excerpt из файла задания", _assignment_file_excerpt(assignment, keywords), BUDGET_EXCERPTS)
+    assembler.add("Excerpts из файлов задания", _assignment_file_excerpt(assignment, keywords), BUDGET_EXCERPTS)
 
     if course:
         assembler.add("Курс задания", _render_course_summary(course), BUDGET_ENTITIES)

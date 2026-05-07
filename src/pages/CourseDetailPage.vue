@@ -72,7 +72,7 @@
       v-if="activeTab === 'assignments'"
       :course="course"
       @ai-help="aiHelpTarget = $event"
-      @preview="previewFile = $event"
+      @open-detail="onOpenDetail"
     />
     <AiPlanTab
       v-if="activeTab === 'aiplan'"
@@ -88,6 +88,15 @@
       :assignment="aiHelpTarget"
       @close="aiHelpTarget = null"
       @open-chat="aiHelpTarget = null"
+    />
+    <AssignmentDetailModal
+      v-if="detailAssignment !== undefined && course"
+      :assignment="detailAssignment"
+      :course-id="course.id"
+      @close="detailAssignment = undefined"
+      @ai-help="onDetailAiHelp"
+      @preview="onDetailPreview"
+      @refresh="refreshCourse"
     />
   </div>
 
@@ -112,6 +121,7 @@ import AiPlanTab       from '@/components/course/AiPlanTab.vue'
 import FilePreviewModal from '@/components/modals/FilePreviewModal.vue'
 import UploadModal     from '@/components/modals/UploadModal.vue'
 import AiHelpModal     from '@/components/modals/AiHelpModal.vue'
+import AssignmentDetailModal from '@/components/modals/AssignmentDetailModal.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -129,6 +139,7 @@ const previewFile    = ref(null)
 const showUpload     = ref(false)
 const aiHelpTarget   = ref(null)
 const showEditCourse = ref(false)
+const detailAssignment = ref(undefined)
 
 const editForm = reactive({ name: '', teacher: '', semester: '', progress: 0, color: '#3d52d5' })
 
@@ -162,6 +173,8 @@ async function handleDownload() {
       await api.downloadMaterial(previewFile.value.courseId, previewFile.value.id, previewFile.value.name)
     } else if (previewFile.value.entityType === 'assignment') {
       await api.downloadAssignment(previewFile.value.courseId, previewFile.value.id, previewFile.value.name)
+    } else if (previewFile.value.entityType === 'assignmentFile') {
+      await api.downloadAssignmentFile(previewFile.value.courseId, previewFile.value.projectId, previewFile.value.id, previewFile.value.name)
     }
   } catch (e) {
     store.showToast('Ошибка скачивания: ' + e.message)
@@ -173,6 +186,23 @@ async function handleDeleteCourse() {
   if (!confirm(`Удалить курс «${course.value.name}»? Все материалы и задания будут удалены.`)) return
   await store.deleteCourse(course.value.id)
   router.push('/')
+}
+
+function onOpenDetail(assignment) {
+  detailAssignment.value = assignment
+}
+
+async function refreshCourse() {
+  await store.fetchCourses()
+}
+
+function onDetailAiHelp() {
+  aiHelpTarget.value = detailAssignment.value
+  detailAssignment.value = undefined
+}
+
+function onDetailPreview(file) {
+  previewFile.value = file
 }
 </script>
 

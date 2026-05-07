@@ -48,6 +48,8 @@ def upgrade_schema():
         conn.execute(text("UPDATE project_tasks SET completed_at = COALESCE(completed_at, created_at, NOW()) WHERE status = 'done'"))
     logger.info("Database auth and project task columns ensured")
 
+    migrate_legacy_assignment_files()
+
 
 def upgrade_legacy_users_auth():
     db = SessionLocal()
@@ -73,6 +75,75 @@ def upgrade_legacy_users_auth():
         if legacy_users:
             db.commit()
             logger.info("Legacy users received auth credentials")
+    finally:
+        db.close()
+
+
+def migrate_legacy_assignment_files():
+    db = SessionLocal()
+    try:
+        assignments_with_legacy_file = (
+            db.query(models.Assignment)
+            .filter(
+                models.Assignment.file_path.isnot(None),
+                models.Assignment.file_name.isnot(None),
+            )
+            .all()
+        )
+        if not assignments_with_legacy_file:
+            return
+
+        already_migrated_ids = set(
+            row[0] for row in db.query(models.AssignmentFile.assignment_id).distinct().all()
+        )
+
+        migrated = 0
+        for assignment in assignments_with_legacy_file:
+            if assignment.id in already_migrated_ids:
+                continue
+
+            import os as _os
+            size = 0
+            mime = "application/octet-stream"
+            icon, icon_bg = "📄", "#e2e8f0"
+            if _os.path.exists(assignment.file_path):
+                stat = _os.stat(assignment.file_path)
+                size = stat.st_size
+
+            if assignment.file_name:
+                ext = _os.path.splitext(assignment.file_name)[1].lower()
+                MIME_MAP = {
+                    ".pdf": ("📄", "#fee2e2", "application/pdf"),
+                    ".docx": ("📝", "#dbeafe", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+                    ".doc": ("📝", "#dbeafe", "application/msword"),
+                    ".xlsx": ("📈", "#d1fae5", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    ".xls": ("📈", "#d1fae5", "application/vnd.ms-excel"),
+                    ".pptx": ("📊", "#fef9c3", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+                    ".ppt": ("📊", "#fef9c3", "application/vnd.ms-powerpoint"),
+                    ".txt": ("📃", "#f0fdf4", "text/plain"),
+                    ".png": ("🖼️", "#d1fae5", "image/png"),
+                    ".jpg": ("🖼️", "#d1fae5", "image/jpeg"),
+                    ".jpeg": ("🖼️", "#d1fae5", "image/jpeg"),
+                    ".zip": ("📦", "#e0e7ff", "application/zip"),
+                }
+                result = MIME_MAP.get(ext)
+                if result:
+                    icon, icon_bg, mime = result
+
+            db.add(models.AssignmentFile(
+                assignment_id=assignment.id,
+                name=assignment.file_name,
+                file_path=assignment.file_path,
+                size_bytes=size,
+                mime_type=mime,
+                icon=icon,
+                icon_bg=icon_bg,
+            ))
+            migrated += 1
+
+        if migrated:
+            db.commit()
+            logger.info("Migrated %d legacy assignment files to assignment_files table", migrated)
     finally:
         db.close()
 

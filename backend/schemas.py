@@ -88,6 +88,19 @@ class AssignmentUpdate(BaseModel):
     status: str | None = None
 
 
+class AssignmentFileOut(BaseModel):
+    id: int
+    assignment_id: int
+    name: str
+    size_bytes: int
+    mime_type: str
+    icon: str
+    icon_bg: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class AssignmentOut(BaseModel):
     id: int
     course_id: int
@@ -99,6 +112,7 @@ class AssignmentOut(BaseModel):
     file_name: str | None = None
     ai_advice: str | None = None
     created_at: datetime
+    files: list[AssignmentFileOut] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 

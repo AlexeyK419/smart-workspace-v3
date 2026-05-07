@@ -369,6 +369,39 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
+  async function uploadAssignmentFile(courseId, assignmentId, file) {
+    try {
+      const uploaded = await api.uploadAssignmentFile(courseId, assignmentId, file)
+      const course = courses.value.find((item) => item.id === courseId)
+      if (course) {
+        const assignment = (course.assignments || []).find((a) => a.id === assignmentId)
+        if (assignment) {
+          assignment.files = [...(assignment.files || []), uploaded]
+        }
+      }
+      showToast('Файл добавлен')
+      return uploaded
+    } catch (e) {
+      showToast('Ошибка загрузки файла: ' + e.message)
+    }
+  }
+
+  async function deleteAssignmentFile(courseId, assignmentId, fileId) {
+    try {
+      await api.deleteAssignmentFile(courseId, assignmentId, fileId)
+      const course = courses.value.find((item) => item.id === courseId)
+      if (course) {
+        const assignment = (course.assignments || []).find((a) => a.id === assignmentId)
+        if (assignment) {
+          assignment.files = (assignment.files || []).filter((f) => f.id !== fileId)
+        }
+      }
+      showToast('Файл удалён')
+    } catch (e) {
+      showToast('Ошибка удаления файла: ' + e.message)
+    }
+  }
+
   async function createScheduleEvent(payload) {
     try {
       const created = await api.createSchedule(payload)
@@ -670,6 +703,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     updateAssignmentFull,
     updateAssignmentStatus,
     deleteAssignment,
+    uploadAssignmentFile,
+    deleteAssignmentFile,
     createScheduleEvent,
     updateScheduleEvent,
     deleteScheduleEvent,
