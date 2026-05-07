@@ -24,6 +24,14 @@
         <div class="file-meta">{{ store.humanSize(file.size_bytes) }} · {{ formatDate(file.created_at) }}</div>
       </div>
       <div class="file-actions">
+        <button class="action-btn" title="Просмотр" @click="emit('preview', {
+          id: file.id, name: file.name, size: store.humanSize(file.size_bytes),
+          icon: file.icon, iconBg: file.icon_bg, type: shortType(file.mime_type),
+          mimeType: file.mime_type, date: formatDate(file.created_at),
+          entityType: 'material', courseId: course.id
+        })">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+        </button>
         <button class="action-btn" title="Скачать" @click="download(file)">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
         </button>
@@ -41,6 +49,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { api } from '@/api/index.js'
 
 const props    = defineProps({ course: { type: Object, required: true } })
+const emit     = defineEmits(['preview', 'upload'])
 const store    = useWorkspaceStore()
 const uploading = ref(false)
 
@@ -64,6 +73,22 @@ async function download(file) {
 async function remove(matId) {
   if (!confirm('Удалить материал?')) return
   await store.deleteMaterial(props.course.id, matId)
+}
+
+function shortType(mime) {
+  const map = {
+    'application/pdf': 'PDF',
+    'application/msword': 'DOC',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+    'application/vnd.oasis.opendocument.text': 'ODT',
+    'text/plain': 'TXT',
+    'image/': 'IMG',
+    'application/zip': 'ZIP',
+  }
+  for (const [key, val] of Object.entries(map)) {
+    if (mime?.includes(key)) return val
+  }
+  return mime?.split('/')[1] || 'FILE'
 }
 
 function formatDate(iso) {

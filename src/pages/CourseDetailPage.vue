@@ -72,6 +72,7 @@
       v-if="activeTab === 'assignments'"
       :course="course"
       @ai-help="aiHelpTarget = $event"
+      @preview="previewFile = $event"
     />
     <AiPlanTab
       v-if="activeTab === 'aiplan'"
@@ -80,7 +81,7 @@
     />
 
     <!-- Modals -->
-    <FilePreviewModal v-if="previewFile" :file="previewFile" @close="previewFile = null" />
+    <FilePreviewModal v-if="previewFile" :file="previewFile" @close="previewFile = null" @download="handleDownload" />
     <UploadModal      v-if="showUpload"  @close="showUpload = false" />
     <AiHelpModal
       v-if="aiHelpTarget"
@@ -102,6 +103,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { api } from '@/api/index.js'
 
 import CourseHero      from '@/components/course/CourseHero.vue'
 import MaterialsTab    from '@/components/course/MaterialsTab.vue'
@@ -152,6 +154,18 @@ async function saveEditCourse() {
   if (!editForm.name || !course.value) return
   await store.updateCourse(course.value.id, { ...editForm })
   showEditCourse.value = false
+}
+
+async function handleDownload() {
+  try {
+    if (previewFile.value.entityType === 'material') {
+      await api.downloadMaterial(previewFile.value.courseId, previewFile.value.id, previewFile.value.name)
+    } else if (previewFile.value.entityType === 'assignment') {
+      await api.downloadAssignment(previewFile.value.courseId, previewFile.value.id, previewFile.value.name)
+    }
+  } catch (e) {
+    store.showToast('Ошибка скачивания: ' + e.message)
+  }
 }
 
 async function handleDeleteCourse() {

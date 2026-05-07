@@ -2,13 +2,10 @@ from __future__ import annotations
 
 import os
 import re
-import zipfile
 from collections import Counter, OrderedDict, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
-import xml.etree.ElementTree as ET
 
-from pypdf import PdfReader
 from sqlalchemy.orm import Session, selectinload
 
 import models
@@ -19,24 +16,7 @@ from ai_embeddings import (
     render_semantic_hits,
     semantic_search_context,
 )
-
-
-TEXT_EXTENSIONS = {
-    ".txt",
-    ".md",
-    ".csv",
-    ".py",
-    ".js",
-    ".ts",
-    ".html",
-    ".css",
-    ".json",
-    ".xml",
-    ".yml",
-    ".yaml",
-    ".sql",
-    ".log",
-}
+from file_utils import read_file_text_raw, TEXT_EXTENSIONS, FILE_READ_LIMIT
 
 WORKSPACE_SUMMARY_CONTEXT_CHAR_LIMIT = 30_000
 CHAT_CONTEXT_CHAR_LIMIT = 22_000
@@ -55,7 +35,6 @@ MAX_FILES_IN_CONTEXT = 4
 MAX_PROJECT_SIGNALS = 8
 
 FILE_CACHE_MAX_ITEMS = 256
-FILE_READ_LIMIT = 260_000
 RAW_FILE_TAIL_BUDGET = 1_200
 EXCERPT_DEFAULT_MAX_CHARS = 900
 
@@ -243,60 +222,6 @@ def _match_name_in_text(name: str, text: str) -> bool:
     right = _to_text(text).casefold()
     return bool(left and right and left in right)
 
-def _read_zip_xml_text(path: str, member: str) -> str:
-    with zipfile.ZipFile(path) as archive:
-        with archive.open(member) as src:
-            root = ET.parse(src).getroot()
-
-    parts: list[str] = []
-    for node in root.iter():
-        value = _to_text(node.text).strip()
-        if value:
-            parts.append(value)
-    return "\n".join(parts)
-
-
-def _read_pdf_text(path: str) -> str:
-    reader = PdfReader(path)
-    parts: list[str] = []
-    used = 0
-
-    for page in reader.pages:
-        value = _to_text(page.extract_text()).strip()
-        if not value:
-            continue
-        remaining = FILE_READ_LIMIT - used
-        if remaining <= 0:
-            break
-        clipped = value[:remaining]
-        parts.append(clipped)
-        used += len(clipped)
-
-    return "\n\n".join(parts)
-
-
-def _read_file_text_raw(file_path: str) -> tuple[str, str]:
-    if not file_path:
-        return "", "файл не прикреплен"
-    if not os.path.exists(file_path):
-        return "", "файл отсутствует на диске"
-
-    ext = os.path.splitext(file_path)[1].lower()
-    try:
-        if ext in TEXT_EXTENSIONS:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as handle:
-                return handle.read(FILE_READ_LIMIT), "ok"
-        if ext == ".odt":
-            return _read_zip_xml_text(file_path, "content.xml")[:FILE_READ_LIMIT], "ok"
-        if ext == ".docx":
-            return _read_zip_xml_text(file_path, "word/document.xml")[:FILE_READ_LIMIT], "ok"
-        if ext == ".pdf":
-            return _read_pdf_text(file_path)[:FILE_READ_LIMIT], "ok"
-        return "", f"тип файла {ext or 'неизвестный'} не поддерживается"
-    except Exception as exc:  # pragma: no cover
-        return "", f"не удалось извлечь текст ({exc.__class__.__name__})"
-
-
 def _get_file_cache_key(file_path: str) -> tuple[str, int, float] | None:
     if not file_path or not os.path.exists(file_path):
         return None
@@ -317,7 +242,7 @@ def _get_cached_file_text(file_path: str | None) -> tuple[str, str]:
         _FILE_TEXT_CACHE.move_to_end(key)
         return cached, "ok"
 
-    text, state = _read_file_text_raw(file_path)
+    text, state = read_file_text_raw(file_path)
     if not text:
         return "", state
 

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from auth import ensure_project_owner, get_current_user, get_project_for_user_or_404, get_user_by_token
 from ai_embeddings import delete_context_chunks
 from database import SessionLocal, get_db
+from file_utils import read_file_text_raw
 import models
 import schemas
 
@@ -499,6 +500,27 @@ def download_file(
     if not os.path.exists(item.file_path):
         raise HTTPException(status_code=404, detail="Файл отсутствует на диске")
     return FileResponse(item.file_path, filename=item.name, media_type=item.mime_type)
+
+
+@router.get("/{project_id}/files/{file_id}/preview")
+def preview_file(
+    project_id: int,
+    file_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _project_for_member_or_404(project_id, current_user.id, db)
+    item = (
+        db.query(models.ProjectFile)
+        .filter(models.ProjectFile.id == file_id, models.ProjectFile.project_id == project_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Файл проекта не найден")
+    text, state = read_file_text_raw(item.file_path)
+    if not text:
+        raise HTTPException(status_code=400, detail=state)
+    return {"text": text, "name": item.name, "mime_type": item.mime_type}
 
 
 @router.delete("/{project_id}/files/{file_id}", status_code=204)

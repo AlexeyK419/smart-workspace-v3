@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from auth import get_course_for_user_or_404, get_current_user
 from ai_embeddings import delete_context_chunks
 from database import get_db
+from file_utils import read_file_text_raw
 import models
 import schemas
 
@@ -202,6 +203,23 @@ def download_assignment_file(
     if not assignment.file_path or not os.path.exists(assignment.file_path):
         raise HTTPException(404, "No file attached")
     return FileResponse(assignment.file_path, filename=assignment.file_name)
+
+
+@router.get("/{assignment_id}/preview")
+def preview_assignment_file(
+    course_id: int,
+    assignment_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    get_course_for_user_or_404(course_id, current_user.id, db)
+    assignment = _get_assignment_or_404(course_id, assignment_id, db)
+    if not assignment.file_path:
+        raise HTTPException(400, "No file attached to this assignment")
+    text, state = read_file_text_raw(assignment.file_path)
+    if not text:
+        raise HTTPException(400, state)
+    return {"text": text, "name": assignment.file_name or "assignment", "mime_type": "application/octet-stream"}
 
 
 @router.delete("/{assignment_id}", status_code=204)

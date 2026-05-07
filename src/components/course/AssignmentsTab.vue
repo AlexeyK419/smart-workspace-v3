@@ -92,6 +92,9 @@
             {{ a.deadline }}
           </div>
           <div style="display:flex;gap:6px;margin-left:auto">
+            <button v-if="a.file_name" class="ac-btn" title="Просмотр" @click="previewAssignment(a)">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            </button>
             <button v-if="a.file_name" class="ac-btn" title="Скачать файл" @click="downloadAssignment(a)">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
               {{ a.file_name }}
@@ -119,7 +122,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { api } from '@/api/index.js'
 
 const props = defineProps({ course: { type: Object, required: true } })
-const emit  = defineEmits(['ai-help'])
+const emit  = defineEmits(['ai-help', 'preview'])
 const store = useWorkspaceStore()
 
 const showForm  = ref(false)
@@ -179,6 +182,15 @@ async function submitForm() {
 
 async function changeStatus(a, e) {
   await store.updateAssignmentStatus(props.course.id, a.id, e.target.value)
+}
+
+async function previewAssignment(a) {
+  emit('preview', {
+    id: a.id, name: a.file_name, size: '—',
+    icon: '📄', iconBg: '#dbeafe',
+    mimeType: a.file_name?.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream',
+    date: a.deadline || '—', entityType: 'assignment', courseId: props.course.id
+  })
 }
 
 async function downloadAssignment(assignment) {

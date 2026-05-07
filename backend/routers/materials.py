@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from auth import get_course_for_user_or_404, get_current_user
 from ai_embeddings import delete_context_chunks
 from database import get_db
+from file_utils import read_file_text_raw
 import models
 import schemas
 
@@ -101,6 +102,27 @@ def download_material(
     if not os.path.exists(mat.file_path):
         raise HTTPException(404, "File missing on disk")
     return FileResponse(mat.file_path, filename=mat.name, media_type=mat.mime_type)
+
+
+@router.get("/{material_id}/preview")
+def preview_material(
+    course_id: int,
+    material_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    get_course_for_user_or_404(course_id, current_user.id, db)
+    mat = (
+        db.query(models.Material)
+        .filter(models.Material.id == material_id, models.Material.course_id == course_id)
+        .first()
+    )
+    if not mat:
+        raise HTTPException(404, "Material not found")
+    text, state = read_file_text_raw(mat.file_path)
+    if not text:
+        raise HTTPException(400, state)
+    return {"text": text, "name": mat.name, "mime_type": mat.mime_type}
 
 
 @router.delete("/{material_id}", status_code=204)

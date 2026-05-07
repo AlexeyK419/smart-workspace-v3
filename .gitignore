@@ -1,4 +1,10 @@
 tmp_*.pyc*
+# --- Agent / workspace metadata ---
+.codex/
+.agents/
+agents.md
+AGENTS.md
+
 # --- Secrets / env ---
 .env
 .env.*

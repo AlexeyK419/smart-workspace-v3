@@ -31,6 +31,24 @@ function getFilenameFromDisposition(header) {
   }
 }
 
+export async function fetchBlobUrl(path) {
+  const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {}
+  const res = await fetch(`${BASE}${path}`, { headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || 'Ошибка загрузки')
+  }
+  const blob = await res.blob()
+  return window.URL.createObjectURL(blob)
+}
+
+export function getDownloadPath(entityType, courseId, projectId, fileId) {
+  if (entityType === 'material') return `/courses/${courseId}/materials/${fileId}/download`
+  if (entityType === 'assignment') return `/courses/${courseId}/assignments/${fileId}/download`
+  if (entityType === 'projectFile') return `/projects/${projectId}/files/${fileId}/download`
+  return null
+}
+
 export async function downloadWithAuth(path, fallbackName = 'download') {
   const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {}
   const res = await fetch(`${BASE}${path}`, { headers })
@@ -129,6 +147,7 @@ export const api = {
   },
   deleteMaterial:       (courseId, matId) => request('DELETE', `/courses/${courseId}/materials/${matId}`),
   downloadMaterial:     (courseId, matId, fileName = 'material') => downloadWithAuth(`/courses/${courseId}/materials/${matId}/download`, fileName),
+  previewMaterial:      (courseId, matId) => request('GET', `/courses/${courseId}/materials/${matId}/preview`),
 
   getAssignments:       (courseId)           => request('GET',   `/courses/${courseId}/assignments/`),
   createAssignment:     (courseId, fd)       => request('POST',  `/courses/${courseId}/assignments/`, fd),
@@ -136,6 +155,7 @@ export const api = {
   fullUpdateAssignment: (courseId, id, fd)   => request('PUT',   `/courses/${courseId}/assignments/${id}`, fd),
   deleteAssignment:     (courseId, id)       => request('DELETE', `/courses/${courseId}/assignments/${id}`),
   downloadAssignment:   (courseId, id, fileName = 'assignment') => downloadWithAuth(`/courses/${courseId}/assignments/${id}/download`, fileName),
+  previewAssignment:    (courseId, id) => request('GET', `/courses/${courseId}/assignments/${id}/preview`),
 
   getSchedule:    ()         => request('GET',    '/schedule/'),
   createSchedule: (data)     => request('POST',   '/schedule/', data),
@@ -167,6 +187,7 @@ export const api = {
   },
   deleteProjectFile:  (projectId, fileId) => request('DELETE', `/projects/${projectId}/files/${fileId}`),
   downloadProjectFile: (projectId, fileId, fileName = 'project-file') => downloadWithAuth(`/projects/${projectId}/files/${fileId}/download`, fileName),
+  previewProjectFile:  (projectId, fileId) => request('GET', `/projects/${projectId}/files/${fileId}/preview`),
 
   aiChat: (messages, opts = {}) =>
     request('POST', '/ai/chat', {

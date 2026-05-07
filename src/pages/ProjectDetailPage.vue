@@ -169,6 +169,7 @@
           <span>{{ store.humanSize(file.size_bytes) }} · {{ file.uploader?.name || 'Участник' }}</span>
         </div>
         <div class="file-actions">
+          <button class="btn btn-ghost" @click="openPreview(file)">Просмотр</button>
           <button class="btn btn-ghost" @click="downloadFile(file)">Скачать</button>
           <button class="btn btn-ghost" @click="removeFile(file)">Удалить</button>
         </div>
@@ -233,6 +234,8 @@
         </div>
       </div>
     </section>
+
+    <FilePreviewModal v-if="previewFile" :file="previewFile" @close="previewFile = null" @download="handleFileDownload" />
 
     <ProjectAiSummaryTab
       v-else-if="activeTab === 'ai'"
@@ -480,6 +483,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { api } from '@/api/index.js'
 import ProjectAiSummaryTab from '@/components/project/ProjectAiSummaryTab.vue'
+import FilePreviewModal from '@/components/modals/FilePreviewModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -500,6 +504,7 @@ const commentDraft = ref('')
 const isTaskModalOpen = ref(false)
 const isTaskCreateModalOpen = ref(false)
 const isProjectEditModalOpen = ref(false)
+const previewFile = ref(null)
 const connectionState = ref('offline')
 const onlineConnections = ref(0)
 const typingUsers = ref([])
@@ -751,8 +756,26 @@ async function uploadSharedFile(event) {
   event.target.value = ''
 }
 
+function openPreview(file) {
+  const short = file.name?.split('.').pop()?.toUpperCase() || 'FILE'
+  previewFile.value = {
+    id: file.id, name: file.name, size: store.humanSize(file.size_bytes),
+    icon: file.icon, iconBg: file.icon_bg, type: short,
+    mimeType: file.mime_type,
+    entityType: 'projectFile', projectId: projectId.value
+  }
+}
+
 async function downloadFile(file) {
   await api.downloadProjectFile(projectId.value, file.id, file.name)
+}
+
+async function handleFileDownload() {
+  try {
+    await api.downloadProjectFile(previewFile.value.projectId, previewFile.value.id, previewFile.value.name)
+  } catch (e) {
+    store.showToast('Ошибка скачивания: ' + e.message)
+  }
 }
 
 async function removeFile(file) {
