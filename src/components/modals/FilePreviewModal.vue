@@ -57,11 +57,17 @@ const docxHtml = ref('')
 
 const mimeLabel = computed(() => {
   const m = props.file.mimeType || ''
-  const map = { 'application/pdf': 'PDF', 'image/': 'IMG',
+  const map = {
+    'application/pdf': 'PDF',
+    'image/': 'IMG',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
-    'application/msword': 'DOC', 'application/vnd.oasis.opendocument.text': 'ODT',
-    'text/plain': 'TXT' }
-  for (const [k, v] of Object.entries(map)) { if (m.startsWith(k)) return v }
+    'application/msword': 'DOC',
+    'application/vnd.oasis.opendocument.text': 'ODT',
+    'text/plain': 'TXT',
+  }
+  for (const [key, value] of Object.entries(map)) {
+    if (m.startsWith(key)) return value
+  }
   return m.split('/')[1]?.toUpperCase() || 'FILE'
 })
 
@@ -74,14 +80,18 @@ const isDocx = computed(() =>
 
 onMounted(async () => {
   try {
+    const path = getDownloadPath(props.file.entityType, props.file.courseId, props.file.projectId, props.file.id)
     if (isPdf.value || isImage.value) {
-      const path = getDownloadPath(props.file.entityType, props.file.courseId, props.file.projectId, props.file.id)
       blobUrl.value = await fetchBlobUrl(path)
       previewText.value = ''
     } else if (isDocx.value) {
-      const path = getDownloadPath(props.file.entityType, props.file.courseId, props.file.projectId, props.file.id)
-      const docxHtmlResult = await fetchAndConvertDocx(path)
-      docxHtml.value = docxHtmlResult
+      const blobUrlValue = await fetchBlobUrl(path)
+      const res = await fetch(blobUrlValue)
+      if (!res.ok) throw new Error('Не удалось загрузить DOCX')
+      const arrayBuffer = await res.arrayBuffer()
+      window.URL.revokeObjectURL(blobUrlValue)
+      const docxHtmlResult = await mammoth.convertToHtml({ arrayBuffer })
+      docxHtml.value = docxHtmlResult.value
       previewText.value = ''
     } else {
       let data
@@ -109,19 +119,6 @@ onUnmounted(() => {
     blobUrl.value = ''
   }
 })
-
-const BASE = 'http://localhost:8000'
-const AUTH_TOKEN_KEY = 'workspace_token'
-
-async function fetchAndConvertDocx(downloadPath) {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY) || ''
-  const headers = token ? { Authorization: `Bearer ${token}` } : {}
-  const res = await fetch(`${BASE}${downloadPath}`, { headers })
-  if (!res.ok) throw new Error('Не удалось загрузить DOCX')
-  const arrayBuffer = await res.arrayBuffer()
-  const result = await mammoth.convertToHtml({ arrayBuffer })
-  return result.value
-}
 </script>
 
 <style scoped>

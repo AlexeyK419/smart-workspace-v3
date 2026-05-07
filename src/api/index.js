@@ -1,7 +1,11 @@
-const BASE = 'http://localhost:8000'
+const DEFAULT_API_BASE_URL = '/api'
 const TOKEN_KEY = 'workspace_token'
 const DEFAULT_TIMEOUT_MS = 15000
 const AI_TIMEOUT_MS = 45000
+
+const RAW_API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).trim()
+const RAW_WS_BASE_URL = (import.meta.env?.VITE_WS_BASE_URL || '').trim()
+const API_BASE_URL = normalizeApiBaseUrl(RAW_API_BASE_URL)
 
 let authToken = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) || '' : ''
 
@@ -17,8 +21,40 @@ export function getAuthToken() {
   return authToken
 }
 
-function toWebSocketBase(url) {
-  return url.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:')
+function normalizeApiBaseUrl(url) {
+  const value = (url || DEFAULT_API_BASE_URL).trim()
+  if (!value) return DEFAULT_API_BASE_URL
+  return value.replace(/\/+$/, '')
+}
+
+function buildApiUrl(path) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${API_BASE_URL}${normalizedPath}`
+}
+
+function getWindowOrigin() {
+  if (typeof window === 'undefined' || !window.location) return ''
+  return window.location.origin
+}
+
+function toWebSocketOrigin(baseUrl) {
+  const url = new URL(baseUrl, getWindowOrigin() || 'http://localhost')
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  url.pathname = ''
+  url.search = ''
+  url.hash = ''
+  return url.toString().replace(/\/+$/, '')
+}
+
+function resolveWebSocketBaseUrl() {
+  if (RAW_WS_BASE_URL) return RAW_WS_BASE_URL.replace(/\/+$/, '')
+  if (/^https?:\/\//i.test(API_BASE_URL)) return `${toWebSocketOrigin(API_BASE_URL)}/ws`
+  const origin = getWindowOrigin()
+  if (origin) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${window.location.host}/ws`
+  }
+  return '/ws'
 }
 
 function getFilenameFromDisposition(header) {
@@ -33,7 +69,7 @@ function getFilenameFromDisposition(header) {
 
 export async function fetchBlobUrl(path) {
   const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {}
-  const res = await fetch(`${BASE}${path}`, { headers })
+  const res = await fetch(buildApiUrl(path), { headers })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || 'Ошибка загрузки')
@@ -53,7 +89,7 @@ export function getDownloadPath(entityType, courseId, projectId, fileId) {
 
 export async function downloadWithAuth(path, fallbackName = 'download') {
   const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {}
-  const res = await fetch(`${BASE}${path}`, { headers })
+  const res = await fetch(buildApiUrl(path), { headers })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || 'Ошибка скачивания')
@@ -95,7 +131,7 @@ async function request(method, path, body = null) {
 
   let res
   try {
-    res = await fetch(`${BASE}${path}`, opts)
+    res = await fetch(buildApiUrl(path), opts)
   } catch (error) {
     if (error?.name === 'AbortError') {
       throw new Error('Превышено время ожидания ответа сервера')
@@ -135,7 +171,7 @@ export const api = {
   markChatRead:    (chatId) => request('POST', `/chats/${chatId}/read`),
   chatsSocketUrl:  () => {
     const token = encodeURIComponent(authToken || '')
-    return `${toWebSocketBase(BASE)}/ws/chats/?token=${token}`
+    return `${resolveWebSocketBaseUrl()}/chats/?token=${token}`
   },
 
   getCourse:     (id)   => request('GET',    `/courses/${id}`),
@@ -193,7 +229,7 @@ export const api = {
   postProjectMessage: (projectId, data) => request('POST', `/projects/${projectId}/messages`, data),
   projectChatSocketUrl: (projectId) => {
     const token = encodeURIComponent(authToken || '')
-    return `${toWebSocketBase(BASE)}/ws/projects/${projectId}/chat?token=${token}`
+    return `${resolveWebSocketBaseUrl()}/projects/${projectId}/chat?token=${token}`
   },
   getProjectFiles:    (projectId) => request('GET', `/projects/${projectId}/files`),
   uploadProjectFile:  (projectId, file) => {

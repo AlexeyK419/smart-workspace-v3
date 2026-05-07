@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from auth import get_course_for_user_or_404, get_current_user
 from ai_embeddings import delete_context_chunks
+from config import settings
 from database import get_db
 from file_utils import read_file_text_raw
 import models
@@ -14,7 +15,7 @@ import schemas
 
 router = APIRouter(prefix="/courses/{course_id}/materials", tags=["materials"])
 
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads")
+UPLOAD_DIR = os.path.join(settings.upload_dir_path, "materials")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MAX_FILE_SIZE = 50 * 1024 * 1024

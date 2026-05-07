@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from auth import ensure_project_owner, get_current_user, get_project_for_user_or_404, get_user_by_token
 from ai_embeddings import delete_context_chunks
+from config import settings
 from database import SessionLocal, get_db
 from file_utils import read_file_text_raw
 import models
@@ -19,7 +20,7 @@ import schemas
 router = APIRouter(prefix="/projects", tags=["projects"])
 ws_router = APIRouter(prefix="/ws/projects", tags=["projects-ws"])
 
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads", "project_files")
+UPLOAD_DIR = os.path.join(settings.upload_dir_path, "project_files")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 MAX_FILE_SIZE = 50 * 1024 * 1024
 

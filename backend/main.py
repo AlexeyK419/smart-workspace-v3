@@ -10,11 +10,13 @@ Smart Student Workspace — FastAPI backend v5
 """
 
 import logging
+import os
 import secrets
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, text
 
 from auth import compute_initials, hash_password
@@ -25,6 +27,8 @@ from routers import admin, auth, users, courses, materials, assignments, ai, sch
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
+
+os.makedirs(settings.upload_dir_path, exist_ok=True)
 
 
 def init_db():
@@ -214,6 +218,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.mount("/uploads", StaticFiles(directory=settings.upload_dir_path), name="uploads")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -234,3 +240,8 @@ app.include_router(projects.ws_router)
 app.include_router(chats.router)
 app.include_router(chats.ws_router)
 app.include_router(ai.router)
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
