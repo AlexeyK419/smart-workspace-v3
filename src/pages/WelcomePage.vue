@@ -106,8 +106,8 @@ const error = ref('')
 const submitting = ref(false)
 
 const loginForm = ref({
-  email: 'demo@workspace.local',
-  password: 'workspace123',
+  email: '',
+  password: '',
 })
 
 const registerForm = ref({
@@ -127,8 +127,8 @@ async function submitLogin() {
   error.value = ''
   submitting.value = true
   try {
-    await authStore.login(loginForm.value)
-    router.replace('/')
+    const user = await authStore.login(loginForm.value)
+    router.replace((user.role || '').toLowerCase() === 'administrator' ? '/admin' : '/')
   } catch (e) {
     error.value = e.message
   } finally {

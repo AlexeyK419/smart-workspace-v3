@@ -24,11 +24,15 @@ def register(payload: schemas.RegisterRequest, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Пользователь с таким email уже существует")
 
+    role = payload.role.strip() or "Студент"
+    if role.lower() == "administrator":
+        role = "Студент"
+
     salt, password_hash = hash_password(payload.password)
     user = models.User(
         name=payload.name.strip(),
         initials=compute_initials(payload.name),
-        role=payload.role.strip() or "Студент",
+        role=role,
         email=email,
         password_salt=salt,
         password_hash=password_hash,

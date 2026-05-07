@@ -7,6 +7,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isReady = ref(false)
 
   const isAuthenticated = computed(() => Boolean(currentUser.value && getAuthToken()))
+  const isAdmin = computed(() => (currentUser.value?.role || '').toLowerCase() === 'administrator')
 
   async function bootstrap() {
     const token = getAuthToken()
@@ -66,6 +67,7 @@ export const useAuthStore = defineStore('auth', () => {
     currentUser,
     isReady,
     isAuthenticated,
+    isAdmin,
     bootstrap,
     login,
     register,

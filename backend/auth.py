@@ -7,6 +7,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session, selectinload
 
+from config import settings
 from database import get_db
 import models
 
@@ -70,6 +71,16 @@ def get_current_user(
 def ensure_same_user(requested_user_id: int, current_user: models.User):
     if current_user.id != requested_user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Нет доступа к данным другого пользователя")
+
+
+def is_admin_user(user: models.User | None) -> bool:
+    return bool(user and (user.email or "").strip().lower() == settings.admin_email.strip().lower())
+
+
+def get_current_admin(current_user: models.User = Depends(get_current_user)) -> models.User:
+    if not is_admin_user(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return current_user
 
 
 def get_course_for_user_or_404(course_id: int, user_id: int, db: Session) -> models.Course:

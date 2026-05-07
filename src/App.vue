@@ -7,7 +7,7 @@
     </div>
   </div>
 
-  <router-view v-else-if="route.meta.guestOnly" />
+  <router-view v-else-if="route.meta.guestOnly || route.meta.standalone" />
 
   <template v-else>
     <MainLayout>
@@ -56,9 +56,21 @@ watch(
     if (!isReady) return
 
     if (isAuthenticated) {
+      if (authStore.isAdmin) {
+        store.resetWorkspace()
+        chatsStore.reset()
+        if (route.name !== 'admin') router.replace('/admin')
+        return
+      }
+
+      if (route.meta.adminOnly) {
+        router.replace('/')
+        return
+      }
+
       await Promise.all([store.fetchCourses(), store.fetchSchedule(), store.fetchProjects(), chatsStore.fetchChats()])
       chatsStore.connectSocket()
-      if (route.meta.guestOnly) router.replace('/')
+      if (route.meta.guestOnly || route.meta.adminOnly) router.replace('/')
     } else {
       store.resetWorkspace()
       chatsStore.reset()

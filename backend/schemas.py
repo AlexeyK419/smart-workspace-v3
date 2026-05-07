@@ -13,6 +13,12 @@ class UserOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AdminUserOut(UserOut):
+    courses_count: int = 0
+    projects_count: int = 0
+    files_count: int = 0
+
+
 class RegisterRequest(BaseModel):
     name: str
     email: str

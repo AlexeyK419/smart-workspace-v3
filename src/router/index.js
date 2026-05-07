@@ -6,6 +6,7 @@ import WelcomePage from '@/pages/WelcomePage.vue'
 import ProjectDetailPage from '@/pages/ProjectDetailPage.vue'
 import SettingsPage from '@/pages/SettingsPage.vue'
 import ChatsPage from '@/pages/ChatsPage.vue'
+import AdminPage from '@/pages/AdminPage.vue'
 
 const routes = [
   {
@@ -49,6 +50,12 @@ const routes = [
     name: 'settings',
     component: SettingsPage,
     meta: { breadcrumb: 'Настройки', requiresAuth: true },
+  },
+  {
+    path: '/admin',
+    name: 'admin',
+    component: AdminPage,
+    meta: { requiresAuth: true, adminOnly: true, standalone: true },
   },
   {
     path: '/:pathMatch(.*)*',

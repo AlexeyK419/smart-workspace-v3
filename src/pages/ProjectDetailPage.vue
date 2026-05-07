@@ -242,7 +242,7 @@
       :project-id="projectId"
     />
 
-    <section v-else class="members-grid">
+    <section v-else-if="activeTab === 'members'" class="members-grid">
       <div class="card">
         <div class="card-header">
           <div>
@@ -1769,3 +1769,4 @@ select.input:focus,
   }
 }
 </style>
+

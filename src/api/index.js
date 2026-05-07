@@ -120,6 +120,8 @@ export const api = {
   logout:   ()     => request('POST', '/auth/logout'),
 
   getCurrentUser: () => request('GET', '/users/me'),
+  getAdminUsers: () => request('GET', '/admin/users'),
+  deleteAdminUser: (id) => request('DELETE', `/admin/users/${id}`),
   updateCurrentUser: (data) => request('PATCH', '/users/me', data),
   updatePassword: (data) => request('POST', '/users/me/password', data),
   getCourses:     () => request('GET', '/users/me/courses'),

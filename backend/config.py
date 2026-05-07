@@ -3,6 +3,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # PostgreSQL
     database_url: str = "postgresql://postgres:12345@localhost:5432/workspace_db"
+
+    # Admin bootstrap
+    admin_email: str = "admin@gmail.com"
+    admin_password: str = ""
     
     # RouterAI (OpenAI-compatible)
     routerai_api_key: str = ""
