@@ -17,16 +17,13 @@
 
         <div class="hero-stats">
           <div>
-            <strong>{{ project.members?.length || 0 }}</strong>
-            <span>участников</span>
+            <strong>{{ formatCountRu(project.members?.length || 0, 'участник', 'участника', 'участников') }}</strong>
           </div>
           <div>
-            <strong>{{ openTasks }}</strong>
-            <span>активных задач</span>
+            <strong>{{ formatCountRu(openTasks, 'активная задача', 'активные задачи', 'активных задач') }}</strong>
           </div>
           <div>
-            <strong>{{ doneTasks }}</strong>
-            <span>закрыто</span>
+            <strong>{{ formatCountRu(doneTasks, 'закрытая задача', 'закрытые задачи', 'закрытых задач') }}</strong>
           </div>
         </div>
 
@@ -484,6 +481,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { api } from '@/api/index.js'
 import ProjectAiSummaryTab from '@/components/project/ProjectAiSummaryTab.vue'
 import FilePreviewModal from '@/components/modals/FilePreviewModal.vue'
+import { formatCountRu } from '@/utils/pluralize'
 
 const route = useRoute()
 const router = useRouter()
@@ -1074,7 +1072,7 @@ function toDateTimeLocal(value) {
   grid-template-columns: repeat(3, 1fr);
   margin-top: 22px;
 }
-.hero-stats strong { display: block; font-size: 26px; }
+.hero-stats strong { display: block; font-size: 18px; font-weight: 600; line-height: 1.25; }
 .hero-stats span,
 .metric-label,
 .section-sub { color: var(--text-muted); font-size: 12px; }
@@ -1681,24 +1679,40 @@ select.input:focus,
     border-radius: 16px;
   }
 
+  .hero-stats strong {
+    font-size: 17px;
+  }
+
   .tabs {
     position: sticky;
     top: 0;
     z-index: 6;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
     padding: 5px;
     border-radius: 20px;
     background: color-mix(in srgb, var(--surface) 82%, transparent);
     backdrop-filter: blur(16px);
     overflow-x: auto;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(112px, 1fr);
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
   }
 
   .tab {
-    min-height: 48px;
-    padding: 8px 10px;
+    flex: 0 0 auto;
+    min-height: 44px;
+    min-width: max-content;
+    padding: 8px 14px;
     border-radius: 15px;
     white-space: nowrap;
+    scroll-snap-align: start;
   }
 
   .task-toolbar,

@@ -3,7 +3,6 @@
     <div class="tab-header">
       <div class="tab-count">{{ course.assignments?.length ?? 0 }} заданий</div>
       <button class="btn btn-primary mobile-plus-btn" @click="emit('open-detail', null)">
-        <span class="mobile-plus-sign" aria-hidden="true">+</span>
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
         <span class="mobile-plus-label">Добавить задание</span>
       </button>
@@ -105,12 +104,7 @@ async function changeStatus(a, e) {
     justify-content: center;
   }
 
-  .mobile-plus-sign {
-    display: inline-flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 18px; font-weight: 700; line-height: 1;
-  }
-
-  .mobile-plus-btn svg { display: none; }
+  .mobile-plus-btn svg { display: block; }
   .mobile-plus-label { display: none; }
   .tab-header .btn svg { color: #fff; }
 

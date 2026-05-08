@@ -8,7 +8,7 @@
       <div class="course-hero-name">{{ course.name }}</div>
       <div class="course-hero-meta">{{ course.teacher }} · {{ course.semester }}</div>
       <div class="course-hero-badges">
-        <span class="badge">{{ (course.assignments || []).length }} заданий</span>
+        <span class="badge">{{ assignmentsCount }}</span>
         <span class="badge badge-active">Активный</span>
       </div>
     </div>
@@ -41,6 +41,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { formatCountRu } from '@/utils/pluralize'
 
 const store = useWorkspaceStore()
 
@@ -49,6 +50,7 @@ const props = defineProps({
 })
 
 const progress = computed(() => store.getCourseProgress(props.course))
+const assignmentsCount = computed(() => formatCountRu((props.course.assignments || []).length, 'задание', 'задания', 'заданий'))
 
 defineEmits(['edit', 'delete'])
 </script>

@@ -8,10 +8,17 @@
       </button>
 
       <RouterLink to="/" class="mobile-brand" aria-label="Интеллектуальное учебное пространство">
-        <span class="mobile-logo">И</span>
+        <span class="mobile-logo" aria-hidden="true">
+          <svg class="mobile-logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 0 4 22.5V5.5Z" />
+            <path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H4v17h13.5A2.5 2.5 0 0 1 20 22.5V5.5Z" />
+            <path d="M8 6.5h8" />
+            <path d="M8 10h5.5" />
+            <path d="M8 13.5h6.5" />
+          </svg>
+        </span>
         <span>
-          <strong>ИУП</strong>
-          <small>Учебное пространство</small>
+          <strong>Учебное пространство</strong>
         </span>
       </RouterLink>
 
@@ -237,8 +244,12 @@ const currentProject = computed(() =>
     place-items: center;
     color: #fff;
     background: linear-gradient(135deg, var(--accent), #8ea5ff);
-    font-weight: 800;
     box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 24%, transparent);
+  }
+
+  .mobile-logo-icon {
+    width: 21px;
+    height: 21px;
   }
 
   .mobile-brand strong,

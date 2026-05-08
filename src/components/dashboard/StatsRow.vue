@@ -16,6 +16,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { formatCountRu, pluralizeRu } from '@/utils/pluralize'
 
 const store = useWorkspaceStore()
 
@@ -28,9 +29,24 @@ const stats = computed(() => {
     : 0
 
   return [
-    { value: totalCourses, label: 'Активных курса', color: 'var(--accent)', sub: 'Личное обучение' },
-    { value: openAssignments, label: 'Личных дедлайнов', color: 'var(--warning)', sub: 'По вашим предметам' },
-    { value: totalProjects, label: 'Командных проектов', color: '#7c3aed', sub: `${store.pendingProjectTasks.length} открытых задач` },
+    {
+      value: totalCourses,
+      label: pluralizeRu(totalCourses, 'Активный курс', 'Активных курса', 'Активных курсов'),
+      color: 'var(--accent)',
+      sub: 'Личное обучение',
+    },
+    {
+      value: openAssignments,
+      label: pluralizeRu(openAssignments, 'Личный дедлайн', 'Личных дедлайна', 'Личных дедлайнов'),
+      color: 'var(--warning)',
+      sub: 'По вашим предметам',
+    },
+    {
+      value: totalProjects,
+      label: pluralizeRu(totalProjects, 'Командный проект', 'Командных проекта', 'Командных проектов'),
+      color: '#7c3aed',
+      sub: formatCountRu(store.pendingProjectTasks.length, 'открытая задача', 'открытые задачи', 'открытых задач'),
+    },
     { value: avgProgress + '%', label: 'Средний прогресс', color: 'var(--success)', progress: avgProgress },
   ]
 })

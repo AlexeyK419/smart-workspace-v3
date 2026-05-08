@@ -4,7 +4,7 @@ tmp_*.pyc*
 .agents/
 agents.md
 AGENTS.md
-
+.env.development
 # --- Secrets / env ---
 .env
 .env.*

@@ -55,7 +55,7 @@
           class="chat-input"
           v-model="inputText"
           placeholder="Спроси ассистента о курсе, дедлайне или теме..."
-          rows="1"
+          rows="2"
           :disabled="isTyping"
           @keydown.enter.exact.prevent="send"
         ></textarea>
@@ -384,6 +384,7 @@ function renderMd(text) {
   outline: none;
   font-family: var(--font-body);
   background: var(--bg);
+  min-height: 60px;
   max-height: 84px;
   line-height: 1.5;
 }

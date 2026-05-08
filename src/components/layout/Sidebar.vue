@@ -95,7 +95,7 @@
           <div class="project-dot" :style="{ background: project.color }"></div>
           <div class="project-copy">
             <span>{{ project.name }}</span>
-            <small>{{ project.members?.length || 0 }} участников</small>
+            <small>{{ formatCountRu(project.members?.length || 0, 'участник', 'участника', 'участников') }}</small>
           </div>
         </RouterLink>
 
@@ -209,6 +209,7 @@ import { useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
+import { formatCountRu } from '@/utils/pluralize'
 
 defineProps({
   open: {

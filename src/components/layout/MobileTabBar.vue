@@ -55,7 +55,7 @@
             <span class="picker-dot" :style="{ background: item.color }"></span>
             <span class="picker-copy">
               <strong>{{ item.name }}</strong>
-              <small>{{ item.meta }}</small>
+              <span class="picker-meta">{{ item.meta }}</span>
             </span>
           </RouterLink>
           <div v-if="!pickerItems.length" class="picker-empty">
@@ -130,6 +130,7 @@ import { computed, inject, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useChatsStore } from '@/stores/chats'
+import { formatCountRu } from '@/utils/pluralize'
 
 const route = useRoute()
 const router = useRouter()
@@ -188,7 +189,7 @@ const pickerItems = computed(() => {
       id: project.id,
       to: `/projects/${project.id}`,
       name: project.name,
-      meta: `${project.members?.length || 0} участников`,
+      meta: formatCountRu(project.members?.length || 0, 'участник', 'участника', 'участников'),
       color: project.color,
     }))
   }
@@ -471,17 +472,18 @@ watch(
   }
 
   .picker-copy strong,
-  .picker-copy small {
+  .picker-copy .picker-meta {
     display: block;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .picker-copy small {
+  .picker-copy .picker-meta {
     color: var(--text-muted);
-    font-size: 11px;
-    margin-top: 2px;
+    font-size: 12.5px;
+    line-height: 1.25;
+    margin-top: 3px;
   }
 
   .picker-empty {
