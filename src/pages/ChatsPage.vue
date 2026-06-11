@@ -364,7 +364,8 @@ function lastMessagePreview(chat) {
 
 function formatDialogTime(value) {
   if (!value) return ''
-  const date = new Date(value)
+  const dateStr = typeof value === 'string' && !value.endsWith('Z') && !value.includes('+') ? value + 'Z' : value
+  const date = new Date(dateStr)
   if (Number.isNaN(date.getTime())) return ''
   const today = new Date()
   const sameDay = date.toDateString() === today.toDateString()
@@ -374,7 +375,8 @@ function formatDialogTime(value) {
 
 function formatMessageTime(value) {
   if (!value) return ''
-  const date = new Date(value)
+  const dateStr = typeof value === 'string' && !value.endsWith('Z') && !value.includes('+') ? value + 'Z' : value
+  const date = new Date(dateStr)
   if (Number.isNaN(date.getTime())) return ''
   return date.toLocaleString('ru-RU', {
     day: '2-digit',

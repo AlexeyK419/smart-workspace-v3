@@ -206,7 +206,7 @@ const days = computed(() =>
 
 const weekLabel = computed(() => {
   const end = addDays(currentWeekStart.value, 6)
-  const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
+  const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
   return `${currentWeekStart.value.getDate()} ${months[currentWeekStart.value.getMonth()]} — ${end.getDate()} ${months[end.getMonth()]} ${end.getFullYear()}`
 })
 

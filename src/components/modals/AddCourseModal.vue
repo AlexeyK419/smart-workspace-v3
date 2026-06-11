@@ -18,7 +18,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Семестр</label>
-          <input class="form-input" v-model="form.semester" placeholder="Весна 2025" />
+          <input class="form-input" v-model="form.semester" :placeholder="`Весна ${currentYear}`" />
         </div>
         <div class="form-group">
           <label class="form-label">Цвет курса</label>
@@ -51,8 +51,9 @@ const emit  = defineEmits(['close'])
 const store = useWorkspaceStore()
 const saving = ref(false)
 
+const currentYear = new Date().getFullYear()
 const COLORS = ['#3d52d5','#e05c2f','#2d7a4f','#b45309','#7c3aed','#0891b2','#db2777','#64748b']
-const form = reactive({ name: '', teacher: '', semester: 'Весна 2025', color: '#3d52d5' })
+const form = reactive({ name: '', teacher: '', semester: `Весна ${currentYear}`, color: '#3d52d5' })
 
 async function submit() {
   if (!form.name) return

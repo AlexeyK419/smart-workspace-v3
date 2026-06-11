@@ -204,7 +204,7 @@ function removeFile(index) {
 function formatDeadline(raw) {
   if (!raw) return ''
   const d = new Date(raw)
-  const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
+  const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`
 }
 
