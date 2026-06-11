@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <div class="page-title">📅 Расписание занятий</div>
-        <div class="page-sub">Сохраняется в базе данных и отображается без наложений</div>
       </div>
       <button class="btn btn-primary" @click="openCreateModal()">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px">

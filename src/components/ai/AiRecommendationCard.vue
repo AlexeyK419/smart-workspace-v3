@@ -231,13 +231,7 @@ function cleanLine(line) {
   box-shadow: 0 18px 45px rgba(31, 26, 20, 0.08), 0 4px 14px rgba(53, 89, 216, 0.08);
 }
 
-.ai-rec-card::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  height: 4px;
-  background: linear-gradient(90deg, var(--accent), var(--success), var(--warning));
-}
+
 
 .ai-rec-header {
   display: flex;

@@ -58,11 +58,19 @@
 
     <div class="header-right">
       <button class="header-btn theme-toggle" :title="themeTitle" @click="uiStore.toggleTheme()">
-        <svg v-if="uiStore.theme === 'dark'" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8 1.42-1.42ZM1 13h3v-2H1v2Zm10-12h2v3h-2V1Zm8.04 2.46-1.41-1.41-1.8 1.79 1.42 1.42 1.79-1.8ZM17.24 19.16l1.8 1.79 1.41-1.41-1.79-1.8-1.42 1.42ZM20 11v2h3v-2h-3ZM4.96 20.95l1.8-1.79-1.42-1.42-1.79 1.8 1.41 1.41ZM11 20h2v3h-2v-3Zm1-14a6 6 0 1 0 0 12 6 6 0 0 0 0-12Z"/>
+        <svg v-if="uiStore.theme === 'dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
         </svg>
-        <svg v-else viewBox="0 0 24 24" fill="currentColor">
-          <path d="M21.64 13A9 9 0 0 1 11 2.36 7 7 0 1 0 21.64 13Z"/>
+        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
         </svg>
       </button>
     </div>

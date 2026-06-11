@@ -177,7 +177,6 @@
       <div class="chat-topbar">
         <div>
           <div class="card-title">Командный чат</div>
-          <div class="section-sub">Обсуждение проекта в реальном времени. История сообщений сохраняется в базе.</div>
         </div>
         <div class="chat-status-pack">
           <span class="connection-pill" :class="connectionState">{{ connectionLabel }}</span>
@@ -1648,13 +1647,14 @@ select.input:focus,
   }
 
   .hero-copy {
-    border-radius: 24px;
-    padding: 22px;
+    border-radius: 20px;
+    padding: 18px;
   }
 
   .hero-copy h1 {
-    font-size: 31px;
-    line-height: 1.1;
+    font-size: 26px;
+    line-height: 1.15;
+    margin-bottom: 6px;
   }
 
   .hero-copy p {
@@ -1662,25 +1662,40 @@ select.input:focus,
   }
 
   .hero-edit-btn {
-    position: static;
-    width: 100%;
-    margin-bottom: 12px;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: auto;
+    margin-bottom: 0;
+    padding: 6px 12px;
   }
 
-  .hero-stats,
-  .hero-inline-metrics,
+  .hero-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 18px;
+    margin-top: 16px;
+  }
+  
+  .hero-inline-metrics {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  
   .task-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .hero-stats div,
   .metric-pill,
   .kpi-box {
-    border-radius: 16px;
+    border-radius: 14px;
+    padding: 12px 14px;
   }
 
   .hero-stats strong {
-    font-size: 17px;
+    font-size: 14px;
+    display: inline-block;
   }
 
   .tabs {

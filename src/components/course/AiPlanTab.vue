@@ -136,6 +136,11 @@ function regenerate() {
   opacity: 0.7;
   cursor: wait;
 }
+.gen-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
 .context-wrap {
   margin-bottom: 16px;
 }

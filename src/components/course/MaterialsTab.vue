@@ -2,7 +2,7 @@
   <div>
     <!-- Header -->
     <div class="files-header">
-      <div class="files-count">{{ course.materials?.length ?? 0 }} файлов</div>
+      <div class="files-count">{{ formatCountRu(course.materials?.length ?? 0, 'файл', 'файла', 'файлов') }}</div>
       <label class="btn btn-primary upload-label">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
         <span>{{ uploading ? 'Загрузка...' : 'Загрузить файл' }}</span>
@@ -47,6 +47,7 @@
 import { ref } from 'vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { api } from '@/api/index.js'
+import { formatCountRu } from '@/utils/pluralize'
 
 const props    = defineProps({ course: { type: Object, required: true } })
 const emit     = defineEmits(['preview', 'upload'])

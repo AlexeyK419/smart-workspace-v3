@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="tab-header">
-      <div class="tab-count">{{ course.assignments?.length ?? 0 }} заданий</div>
+      <div class="tab-count">{{ formatCountRu(course.assignments?.length ?? 0, 'задание', 'задания', 'заданий') }}</div>
       <button class="btn btn-primary mobile-plus-btn" @click="emit('open-detail', null)">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
         <span class="mobile-plus-label">Добавить задание</span>
@@ -17,14 +17,13 @@
       <div v-for="a in course.assignments" :key="a.id" class="assignment-card" @click="emit('open-detail', a)">
         <div class="ac-top">
           <div class="ac-title">{{ a.title }}</div>
-          <div style="display:flex;gap:6px;align-items:center" @click.stop>
-            <select class="status-select" :value="a.status" @change="changeStatus(a, $event)">
+          <div style="display:flex;align-items:center" @click.stop>
+            <select class="status-select chip" :class="'chip-' + a.status" :value="a.status" @change="changeStatus(a, $event)">
               <option value="pending">Ожидает</option>
               <option value="progress">В процессе</option>
               <option value="done">Сдано</option>
               <option value="overdue">Просрочено</option>
             </select>
-            <span class="chip" :class="'chip-' + a.status">{{ store.statusLabel(a.status) }}</span>
           </div>
         </div>
 
@@ -46,6 +45,7 @@
 
 <script setup>
 import { useWorkspaceStore } from '@/stores/workspace'
+import { formatCountRu } from '@/utils/pluralize'
 
 const props = defineProps({ course: { type: Object, required: true } })
 const emit  = defineEmits(['ai-help', 'open-detail'])
@@ -90,10 +90,19 @@ async function changeStatus(a, e) {
 .ac-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .ac-deadline { font-size: 11.5px; color: var(--text-muted); display: flex; align-items: center; gap: 3px; }
 .status-select {
-  font-size: 11px; border: 1px solid var(--border); border-radius: 4px;
-  padding: 2px 4px; background: var(--bg); font-family: var(--font-body);
-  color: var(--text-secondary); cursor: pointer; outline: none;
+  border: 1px solid transparent; 
+  padding-right: 20px;
+  cursor: pointer; outline: none;
+  font-family: var(--font-body);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+  background-size: 14px;
 }
+.status-select.chip-pending { border-color: var(--border); }
+.status-select option { background: var(--bg); color: var(--text-primary); }
 
 @media (max-width: 760px) {
   .tab-header { gap: 12px; }
